@@ -58,8 +58,12 @@ export default function ReadinessPage() {
       const data = {
         homeType: store.homeType,
         renovationScope: store.renovationScope,
-        budgetRange: store.budgetUndecided ? { min: 0, max: 0 } : store.budgetRange,
-        timeline: store.timeline,
+        budgetRange: store.budgetUndecided ? null : store.budgetRange,
+        budget: store.budgetUndecided
+          ? 'undecided'
+          : `$${Math.round(store.budgetRange.min / 1000)}K-$${Math.round(store.budgetRange.max / 1000)}K`,
+        timeline: store.timeline.start || 'flexible',
+        completionTimeline: store.timeline.completion || 'flexible',
         zipCode: store.zipCode,
         propertyAddress: store.propertyAddress || undefined,
         contactName: store.contactName,
