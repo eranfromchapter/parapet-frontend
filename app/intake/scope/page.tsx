@@ -46,9 +46,8 @@ function ScopeNotesWithVoice({ value, onChange }: { value: string; onChange: (va
 
   const startListening = useCallback(() => {
     if (!speechSupported) return;
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SR();
     recognition.continuous = true;
     recognition.interimResults = false;
     recognition.lang = "en-US";
@@ -56,21 +55,17 @@ function ScopeNotesWithVoice({ value, onChange }: { value: string; onChange: (va
     recognition.onresult = (event: any) => {
       let transcript = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          transcript += event.results[i][0].transcript;
-        }
+        if (event.results[i].isFinal) transcript += event.results[i][0].transcript;
       }
       if (transcript) {
         const current = valueRef.current;
         const separator = current.trim() ? " " : "";
-        const newVal = (current + separator + transcript.trim()).slice(0, 500);
-        onChange(newVal);
+        onChange((current + separator + transcript.trim()).slice(0, 500));
       }
     };
 
     recognition.onerror = () => stopListening();
     recognition.onend = () => setIsListening(false);
-
     recognitionRef.current = recognition;
     recognition.start();
     setIsListening(true);
@@ -82,9 +77,7 @@ function ScopeNotesWithVoice({ value, onChange }: { value: string; onChange: (va
   }, [isListening, startListening, stopListening]);
 
   useEffect(() => {
-    return () => {
-      if (recognitionRef.current) recognitionRef.current.stop();
-    };
+    return () => { if (recognitionRef.current) recognitionRef.current.stop(); };
   }, []);
 
   return (
@@ -99,8 +92,8 @@ function ScopeNotesWithVoice({ value, onChange }: { value: string; onChange: (va
             onClick={toggleListening}
             className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-medium transition-all flex-shrink-0 ${
               isListening
-                ? "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/30"
-                : "bg-[#1E3A5F]/5 dark:bg-blue-400/10 text-[#1E3A5F] dark:text-blue-300 border border-[#1E3A5F]/20 dark:border-blue-400/20"
+                ? "bg-red-500/10 text-red-600 border border-red-500/30"
+                : "bg-[#1E3A5F]/5 text-[#1E3A5F] border border-[#1E3A5F]/20"
             }`}
           >
             {isListening ? (
@@ -123,26 +116,22 @@ function ScopeNotesWithVoice({ value, onChange }: { value: string; onChange: (va
       <div className="relative">
         <textarea
           value={value}
-          onChange={(e) => {
-            if (e.target.value.length <= 500) onChange(e.target.value);
-          }}
+          onChange={(e) => { if (e.target.value.length <= 500) onChange(e.target.value); }}
           placeholder="Describe any additional details about your renovation..."
           className={`w-full h-24 p-3 text-xs rounded-xl border bg-card text-foreground resize-none focus:outline-none focus:ring-2 placeholder:text-muted-foreground/50 transition-colors ${
             isListening
-              ? "border-red-500/40 focus:ring-red-500/20 bg-red-50/30 dark:bg-red-950/10"
-              : "border-border focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F] dark:focus:ring-blue-400/20 dark:focus:border-blue-400"
+              ? "border-red-500/40 focus:ring-red-500/20 bg-red-50/30"
+              : "border-border focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F]"
           }`}
         />
         <div className="absolute bottom-2 right-3 flex items-center gap-2">
           {isListening && (
             <span className="flex items-center gap-1 px-1.5 py-0.5 bg-red-500/10 rounded">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-[9px] font-medium text-red-600 dark:text-red-400">Listening</span>
+              <span className="text-[9px] font-medium text-red-600">Listening</span>
             </span>
           )}
-          <span className="text-[10px] text-muted-foreground">
-            {value.length}/500
-          </span>
+          <span className="text-[10px] text-muted-foreground">{value.length}/500</span>
         </div>
       </div>
     </div>
@@ -173,7 +162,7 @@ export default function IntakeScope() {
           What are you renovating?
         </h2>
         {formData.scope.length > 0 && (
-          <span className="text-xs font-medium text-[#1E3A5F] dark:text-blue-300 bg-[#1E3A5F]/10 dark:bg-blue-400/10 px-2 py-0.5 rounded-full">
+          <span className="text-xs font-medium text-[#1E3A5F] bg-[#1E3A5F]/10 px-2 py-0.5 rounded-full">
             {formData.scope.length} selected
           </span>
         )}
@@ -193,19 +182,19 @@ export default function IntakeScope() {
               onClick={() => toggleScope(option.value)}
               className={`relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
                 isSelected
-                  ? "border-[#1E3A5F] bg-[#1E3A5F]/5 dark:border-blue-400 dark:bg-blue-400/10"
+                  ? "border-[#1E3A5F] bg-[#1E3A5F]/5 shadow-sm"
                   : "border-border hover:border-[#1E3A5F]/30 bg-card"
               }`}
             >
               {isSelected && (
-                <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#1E3A5F] dark:bg-blue-400 flex items-center justify-center">
+                <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[#1E3A5F] flex items-center justify-center animate-[fadeIn_0.2s_ease-out]">
                   <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                     <path d="M2.5 6L5 8.5L9.5 4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
               )}
               <div className="w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center">
-                <Icon size={16} className="text-[#1E3A5F] dark:text-blue-300" />
+                <Icon size={16} className="text-[#1E3A5F]" />
               </div>
               <span className="text-[11px] font-medium text-foreground text-center leading-tight">
                 {option.label}

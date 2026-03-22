@@ -116,11 +116,11 @@ function GeneratingContent() {
         <div className="relative w-20 h-20 mb-8">
           <svg className="w-20 h-20 animate-[spin_2.5s_linear_infinite]" viewBox="0 0 80 80" fill="none">
             <circle cx="40" cy="40" r="36" stroke="hsl(var(--muted))" strokeWidth="3" />
-            <path d="M40 4 A36 36 0 0 1 76 40" stroke="#1E3A5F" strokeWidth="3" strokeLinecap="round" className="dark:stroke-blue-400" />
+            <path d="M40 4 A36 36 0 0 1 76 40" stroke="#1E3A5F" strokeWidth="3" strokeLinecap="round" />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="animate-[pulse_2s_ease-in-out_infinite]">
-              <ParapetLogo size={28} className="text-[#1E3A5F] dark:text-blue-300" />
+              <ParapetLogo size={28} className="text-[#1E3A5F]" />
             </div>
           </div>
         </div>
@@ -150,7 +150,7 @@ function GeneratingContent() {
                       <path d="M4 7L6 9L10 5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   ) : status === "active" ? (
-                    <div className="w-3 h-3 rounded-full border-2 border-[#1E3A5F] dark:border-blue-400 border-t-transparent animate-spin" />
+                    <div className="w-3 h-3 rounded-full border-2 border-[#1E3A5F] border-t-transparent animate-spin" />
                   ) : (
                     <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
                   )}

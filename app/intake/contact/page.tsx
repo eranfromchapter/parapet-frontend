@@ -4,15 +4,19 @@ import { useRouter } from "next/navigation";
 import { useIntakeWizard } from "@/context/IntakeWizardContext";
 import IntakeWizardShell from "@/components/IntakeWizardShell";
 import { ShieldCheck } from "lucide-react";
+import { useState } from "react";
 
 export default function IntakeContact() {
   const router = useRouter();
   const { formData, updateFormData } = useIntakeWizard();
+  const [emailTouched, setEmailTouched] = useState(false);
 
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email);
   const isValid =
     formData.fullName.trim().length > 0 &&
     formData.email.trim().length > 0 &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email);
+    emailValid;
+  const showEmailError = emailTouched && formData.email.length > 0 && !emailValid;
 
   return (
     <IntakeWizardShell
@@ -37,7 +41,8 @@ export default function IntakeContact() {
             value={formData.fullName}
             onChange={(e) => updateFormData({ fullName: e.target.value })}
             placeholder="Your full name"
-            className="w-full h-11 px-3.5 text-sm rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F] dark:focus:ring-blue-400/20 dark:focus:border-blue-400 placeholder:text-muted-foreground/50"
+            autoComplete="name"
+            className="w-full h-11 px-3.5 text-sm rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F] placeholder:text-muted-foreground/50"
           />
         </div>
 
@@ -49,9 +54,18 @@ export default function IntakeContact() {
             type="email"
             value={formData.email}
             onChange={(e) => updateFormData({ email: e.target.value })}
+            onBlur={() => setEmailTouched(true)}
             placeholder="you@email.com"
-            className="w-full h-11 px-3.5 text-sm rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F] dark:focus:ring-blue-400/20 dark:focus:border-blue-400 placeholder:text-muted-foreground/50"
+            autoComplete="email"
+            className={`w-full h-11 px-3.5 text-sm rounded-xl border bg-card text-foreground focus:outline-none focus:ring-2 placeholder:text-muted-foreground/50 ${
+              showEmailError
+                ? "border-red-400 focus:ring-red-200 focus:border-red-400"
+                : "border-border focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F]"
+            }`}
           />
+          {showEmailError && (
+            <p className="text-[11px] text-red-500 mt-1">Please enter a valid email address</p>
+          )}
         </div>
 
         <div>
@@ -60,10 +74,12 @@ export default function IntakeContact() {
           </label>
           <input
             type="tel"
+            inputMode="tel"
             value={formData.phone}
             onChange={(e) => updateFormData({ phone: e.target.value })}
             placeholder="(555) 000-0000"
-            className="w-full h-11 px-3.5 text-sm rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F] dark:focus:ring-blue-400/20 dark:focus:border-blue-400 placeholder:text-muted-foreground/50"
+            autoComplete="tel"
+            className="w-full h-11 px-3.5 text-sm rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F] placeholder:text-muted-foreground/50"
           />
         </div>
       </div>

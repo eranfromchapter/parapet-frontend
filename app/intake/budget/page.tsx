@@ -93,7 +93,7 @@ export default function IntakeBudget() {
         <div className="bg-card border border-border rounded-xl p-5 mb-4">
           <p className="text-xs text-muted-foreground text-center mb-1">Selected range</p>
           <p className="text-xl font-bold text-foreground text-center mb-5">
-            {formatBudget(formData.budgetMin)} \u2013 {formatBudget(formData.budgetMax)}
+            {formatBudget(formData.budgetMin)} {'\u2013'} {formatBudget(formData.budgetMax)}
           </p>
 
           <div
@@ -112,12 +112,12 @@ export default function IntakeBudget() {
               }}
             />
             <div
-              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-white border-2 border-[#1E3A5F] dark:bg-gray-800 dark:border-blue-400 shadow-md cursor-grab active:cursor-grabbing z-10"
+              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-white border-2 border-[#1E3A5F] shadow-md cursor-grab active:cursor-grabbing z-10"
               style={{ left: `${leftPct}%` }}
               onPointerDown={handlePointerDown("min")}
             />
             <div
-              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-white border-2 border-[#1E3A5F] dark:bg-gray-800 dark:border-blue-400 shadow-md cursor-grab active:cursor-grabbing z-10"
+              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-white border-2 border-[#1E3A5F] shadow-md cursor-grab active:cursor-grabbing z-10"
               style={{ left: `${rightPct}%` }}
               onPointerDown={handlePointerDown("max")}
             />
@@ -131,7 +131,7 @@ export default function IntakeBudget() {
             ))}
           </div>
 
-          <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-amber-50/50 dark:bg-amber-400/5 border border-amber-200/50 dark:border-amber-400/10">
+          <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-amber-50/50 border border-amber-200/50">
             <Lightbulb size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
             <p className="text-[11px] text-foreground leading-relaxed">
               <span className="font-medium">Tip:</span> {getScopeTip()}
@@ -140,9 +140,9 @@ export default function IntakeBudget() {
         </div>
       )}
 
-      <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-muted/40 border border-border/40">
+      <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-emerald-50/50 border border-emerald-200/40">
         <ShieldCheck size={16} className="text-[#10B981] flex-shrink-0 mt-0.5" />
-        <p className="text-[11px] text-muted-foreground leading-relaxed">
+        <p className="text-[11px] text-foreground/80 leading-relaxed font-medium">
           Your budget is private and confidential. We will never share it with
           contractors, vendors, or any third party.
         </p>

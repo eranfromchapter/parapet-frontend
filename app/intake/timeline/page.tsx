@@ -55,19 +55,19 @@ export default function IntakeTimeline() {
               onClick={() => updateFormData({ projectStart: option.value })}
               className={`relative flex items-center gap-3 p-3.5 rounded-xl border-2 transition-all ${
                 isSelected
-                  ? "border-[#1E3A5F] bg-[#1E3A5F]/5 dark:border-blue-400 dark:bg-blue-400/10"
+                  ? "border-[#1E3A5F] bg-[#1E3A5F]/5 shadow-sm"
                   : "border-border hover:border-[#1E3A5F]/30 bg-card"
               } ${isLastOdd ? "col-span-2" : ""}`}
             >
               {isSelected && (
-                <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-[#1E3A5F] dark:bg-blue-400 flex items-center justify-center">
+                <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-[#1E3A5F] flex items-center justify-center">
                   <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                     <path d="M2.5 6L5 8.5L9.5 4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
               )}
               <div className="w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center flex-shrink-0">
-                <Icon size={16} className="text-[#1E3A5F] dark:text-blue-300" />
+                <Icon size={16} className="text-[#1E3A5F]" />
               </div>
               <span className="text-sm font-medium text-foreground">{option.label}</span>
             </button>
@@ -87,7 +87,7 @@ export default function IntakeTimeline() {
               onClick={() => updateFormData({ completionTimeline: option.value })}
               className={`p-2.5 rounded-xl border-2 text-center transition-all ${
                 isSelected
-                  ? "border-[#1E3A5F] bg-[#1E3A5F] text-white dark:border-blue-400 dark:bg-blue-500"
+                  ? "border-[#1E3A5F] bg-[#1E3A5F] text-white"
                   : "border-border hover:border-[#1E3A5F]/30 bg-card text-foreground"
               }`}
             >

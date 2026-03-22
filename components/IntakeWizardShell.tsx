@@ -39,7 +39,7 @@ export default function IntakeWizardShell({
     if (currentStep > 1) {
       router.push(STEPS[stepIndex - 1].path);
     } else {
-      router.push("/dashboard");
+      router.push("/");
     }
   };
 
@@ -56,7 +56,7 @@ export default function IntakeWizardShell({
       {/* Header */}
       <div className="px-5 pt-6 pb-2">
         <h1
-          className="text-lg font-bold text-[#1E3A5F] dark:text-blue-300 text-center"
+          className="text-lg font-bold text-[#1E3A5F] text-center"
           data-testid="text-wizard-title"
         >
           Renovation Readiness Assessment
@@ -73,7 +73,7 @@ export default function IntakeWizardShell({
           <span className="text-xs font-medium text-foreground">
             Step {currentStep} of {STEPS.length}
           </span>
-          <span className="text-xs font-medium text-foreground">
+          <span className="text-xs font-semibold text-[#1E3A5F]">
             {STEPS[stepIndex].label}
           </span>
         </div>
@@ -86,54 +86,34 @@ export default function IntakeWizardShell({
             }}
           />
         </div>
-        {/* Step labels */}
-        <div className="flex justify-between mt-2.5 overflow-x-auto gap-0.5">
-          {STEPS.map((step, i) => (
-            <button
-              key={step.label}
-              className={`text-[10px] whitespace-nowrap transition-colors ${
-                i < currentStep
-                  ? "text-[#1E3A5F] dark:text-blue-300 font-medium"
-                  : i === stepIndex
-                  ? "text-foreground font-semibold"
-                  : "text-muted-foreground/50"
-              }`}
-              onClick={() => {
-                if (i < currentStep) router.push(step.path);
-              }}
-              disabled={i >= currentStep}
-              data-testid={`step-label-${step.label.toLowerCase().replace(/\s/g, "-")}`}
-            >
-              {step.label}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 px-5 py-4 overflow-y-auto">{children}</div>
+      {/* Content with fade-in */}
+      <div className="flex-1 px-5 py-4 overflow-y-auto animate-[fadeIn_0.3s_ease-out]">{children}</div>
 
       {/* Navigation */}
-      <div className="px-5 py-4 border-t border-border/40 flex items-center justify-between bg-background">
-        <button
-          onClick={handleBack}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          data-testid="button-back"
-        >
-          <ChevronLeft size={16} />
-          Back
-        </button>
-        {!hideNext && (
-          <Button
-            onClick={handleNext}
-            disabled={nextDisabled}
-            className="bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white font-medium text-sm px-5 h-10 rounded-xl flex items-center gap-1.5"
-            data-testid="button-next"
+      <div className="px-5 py-4 border-t border-border/40 bg-background">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            data-testid="button-back"
           >
-            {nextLabel || "Next"}
-            <ChevronRight size={16} />
-          </Button>
-        )}
+            <ChevronLeft size={16} />
+            Back
+          </button>
+          {!hideNext && (
+            <Button
+              onClick={handleNext}
+              disabled={nextDisabled}
+              className="flex-1 sm:flex-none sm:ml-auto bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white font-medium text-sm px-5 h-10 rounded-xl flex items-center justify-center gap-1.5"
+              data-testid="button-next"
+            >
+              {nextLabel || "Next"}
+              <ChevronRight size={16} />
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

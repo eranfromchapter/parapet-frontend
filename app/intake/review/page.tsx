@@ -74,7 +74,7 @@ export default function IntakeReview() {
     setError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
       const body = mapFormToBackend(formData);
 
       const res = await fetch(`${apiUrl}/v1/readiness-reports`, {
@@ -164,7 +164,7 @@ export default function IntakeReview() {
             </div>
             <button
               onClick={() => router.push(section.editPath)}
-              className="text-xs font-medium text-[#2BCBBA] hover:text-[#1E3A5F] dark:hover:text-blue-300 flex items-center gap-1 flex-shrink-0 mt-0.5 transition-colors"
+              className="text-xs font-semibold text-[#2BCBBA] hover:text-[#1E3A5F] flex items-center gap-1.5 flex-shrink-0 mt-0.5 transition-colors px-2 py-1 rounded-lg hover:bg-[#1E3A5F]/5"
             >
               <Pencil size={12} />
               Edit
@@ -174,8 +174,8 @@ export default function IntakeReview() {
       </div>
 
       {error && (
-        <div className="mt-4 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/40">
-          <p className="text-xs text-red-700 dark:text-red-400">{error}</p>
+        <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200">
+          <p className="text-xs text-red-700">{error}</p>
         </div>
       )}
 
@@ -183,7 +183,7 @@ export default function IntakeReview() {
         <Button
           onClick={handleGenerate}
           disabled={generating}
-          className="w-full h-12 bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-2"
+          className="w-full h-12 bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#1E3A5F]/20"
         >
           {generating ? (
             <>
@@ -198,6 +198,10 @@ export default function IntakeReview() {
           )}
         </Button>
       </div>
+
+      <p className="text-[10px] text-muted-foreground text-center mt-2">
+        Takes about 30 seconds. No credit card required.
+      </p>
 
       <p className="text-[10px] text-muted-foreground text-center mt-3 leading-relaxed">
         By submitting, you agree to our{" "}

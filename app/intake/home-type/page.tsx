@@ -45,19 +45,19 @@ export default function IntakeHomeType() {
               onClick={() => updateFormData({ homeType: type.value })}
               className={`relative flex items-center gap-3 p-4 rounded-xl border-2 transition-all text-left ${
                 isSelected
-                  ? "border-[#1E3A5F] bg-[#1E3A5F]/5 dark:border-blue-400 dark:bg-blue-400/10"
+                  ? "border-[#1E3A5F] bg-[#1E3A5F]/5 shadow-sm"
                   : "border-border hover:border-[#1E3A5F]/30 bg-card"
-              } ${isLastOdd ? "col-span-2 sm:col-span-1" : ""}`}
+              } ${isLastOdd ? "col-span-2" : ""}`}
             >
               {isSelected && (
-                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[#1E3A5F] dark:bg-blue-400 flex items-center justify-center">
+                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[#1E3A5F] flex items-center justify-center animate-[fadeIn_0.2s_ease-out]">
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                     <path d="M2.5 6L5 8.5L9.5 4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
               )}
               <div className="w-9 h-9 rounded-lg bg-muted/60 flex items-center justify-center flex-shrink-0">
-                <Icon size={18} className="text-[#1E3A5F] dark:text-blue-300" />
+                <Icon size={18} className="text-[#1E3A5F]" />
               </div>
               <span className="text-sm font-medium text-foreground flex items-center gap-1.5">
                 {type.label}
@@ -79,7 +79,7 @@ export default function IntakeHomeType() {
       </div>
 
       {showInfo && (
-        <div className="mt-3 p-3 rounded-xl bg-[#1E3A5F]/5 dark:bg-blue-400/10 border border-[#1E3A5F]/10 dark:border-blue-400/20">
+        <div className="mt-3 p-3 rounded-xl bg-[#1E3A5F]/5 border border-[#1E3A5F]/10">
           <p className="text-xs text-foreground leading-relaxed">
             {HOME_TYPES.find((t) => t.value === showInfo)?.info}
           </p>
