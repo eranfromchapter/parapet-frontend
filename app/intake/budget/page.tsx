@@ -125,7 +125,7 @@ export default function IntakeBudget() {
 
           <div className="flex justify-between mt-1">
             {BUDGET_MARKS.map((m) => (
-              <span key={m} className="text-[9px] text-muted-foreground">
+              <span key={m} className="text-[10px] text-muted-foreground">
                 {formatBudget(m)}
               </span>
             ))}

@@ -171,7 +171,7 @@ export default function IntakeScope() {
         Select all areas that apply. You can choose multiple.
       </p>
 
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5">
         {SCOPE_OPTIONS.map((option) => {
           const Icon = option.icon;
           const isSelected = formData.scope.includes(option.value);
@@ -180,7 +180,7 @@ export default function IntakeScope() {
             <button
               key={option.value}
               onClick={() => toggleScope(option.value)}
-              className={`relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+              className={`relative flex flex-col items-center justify-center gap-2 p-3 min-h-[80px] rounded-xl border-2 transition-all ${
                 isSelected
                   ? "border-[#1E3A5F] bg-[#1E3A5F]/5 shadow-sm"
                   : "border-border hover:border-[#1E3A5F]/30 bg-card"

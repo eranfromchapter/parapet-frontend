@@ -52,32 +52,28 @@ export default function IntakeWizardShell({
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* Header */}
-      <div className="px-5 pt-6 pb-2">
-        <h1
-          className="text-lg font-bold text-[#1E3A5F] text-center"
-          data-testid="text-wizard-title"
-        >
+    <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-background relative shadow-xl">
+      {/* Header — compressed */}
+      <div className="px-5 pt-5 pb-1 text-center">
+        <h1 className="text-lg font-bold text-[#1E3A5F]">
           Renovation Readiness Assessment
         </h1>
-        <p className="text-xs text-muted-foreground text-center mt-1 leading-relaxed max-w-[300px] mx-auto">
-          Answer a few questions and get a personalized readiness report with
-          cost estimates, regulatory checklists, and risk assessment.
+        <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+          Personalized cost estimates, regulatory checklists, and risk assessment.
         </p>
       </div>
 
-      {/* Progress */}
-      <div className="px-5 pt-4 pb-2">
+      {/* Progress — clean */}
+      <div className="px-5 pt-3 pb-2">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-foreground">
+          <span className="text-[11px] font-medium text-muted-foreground">
             Step {currentStep} of {STEPS.length}
           </span>
-          <span className="text-xs font-semibold text-[#1E3A5F]">
+          <span className="text-[11px] font-semibold text-foreground">
             {STEPS[stepIndex].label}
           </span>
         </div>
-        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+        <div className="h-1 bg-muted rounded-full overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-500 ease-out"
             style={{
@@ -92,28 +88,25 @@ export default function IntakeWizardShell({
       <div className="flex-1 px-5 py-4 overflow-y-auto animate-[fadeIn_0.3s_ease-out]">{children}</div>
 
       {/* Navigation */}
-      <div className="px-5 py-4 border-t border-border/40 bg-background">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleBack}
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0"
-            data-testid="button-back"
+      <div className="px-5 py-3 border-t border-border/30 flex items-center justify-between bg-background">
+        <button
+          onClick={handleBack}
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          data-testid="button-back"
+        >
+          <ChevronLeft size={16} />
+          Back
+        </button>
+        {!hideNext && (
+          <Button
+            onClick={handleNext}
+            disabled={nextDisabled}
+            className="bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white font-semibold text-sm h-11 px-8 rounded-xl"
+            data-testid="button-next"
           >
-            <ChevronLeft size={16} />
-            Back
-          </button>
-          {!hideNext && (
-            <Button
-              onClick={handleNext}
-              disabled={nextDisabled}
-              className="flex-1 sm:flex-none sm:ml-auto bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white font-medium text-sm px-5 h-10 rounded-xl flex items-center justify-center gap-1.5"
-              data-testid="button-next"
-            >
-              {nextLabel || "Next"}
-              <ChevronRight size={16} />
-            </Button>
-          )}
-        </div>
+            {nextLabel || "Next"} <ChevronRight size={16} />
+          </Button>
+        )}
       </div>
     </div>
   );
