@@ -6,32 +6,37 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   TrendingUp, Clock, DollarSign, AlertTriangle, CheckCircle2,
-  Info, Download, ArrowRight, Target, MapPin,
-  Building2, Landmark, FileText, Leaf, Home,
-  ChevronDown, ChevronUp, Scale,
+  Info, Download, ArrowRight, Target, Shield,
+  FileText, Users, ListChecks, AlertCircle,
 } from "lucide-react";
 import ParapetLogo from "@/components/ParapetLogo";
 import PageHeader from "@/components/PageHeader";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-function fmt(n: number | null | undefined): string {
-  if (n == null) return "Calculating...";
-  return "$" + n.toLocaleString("en-US");
-}
+// ── Formatters ──────────────────────────────────────────────────────────
 
-function fmtK(n: number | null | undefined): string {
-  if (n == null) return "...";
-  if (n >= 1000) return `$${Math.round(n / 1000)}K`;
+const formatCurrency = (n: number | null | undefined): string =>
+  n != null ? `$${n.toLocaleString("en-US")}` : "\u2014";
+
+const formatCurrencyK = (n: number | null | undefined): string => {
+  if (n == null) return "\u2014";
+  if (n >= 1000) return `$${Math.round(n / 1000).toLocaleString()}K`;
   return `$${n.toLocaleString()}`;
-}
+};
 
-// Confidence Gauge
-function ConfidenceGauge({ value }: { value: number | null | undefined }) {
-  const v = value ?? 0;
+const daysToWeeks = (days: number | null | undefined): number | null =>
+  days != null ? Math.round(days / 7) : null;
+
+// ── Risk Score Gauge (0-10 scale) ───────────────────────────────────────
+
+function RiskScoreGauge({ score }: { score: number | null | undefined }) {
+  const v = score ?? 0;
+  const maxScore = 10;
+  const pct = (v / maxScore) * 100;
   const circumference = 2 * Math.PI * 40;
-  const dashOffset = circumference - (v / 100) * circumference;
-  const color = v >= 80 ? "#10B981" : v >= 65 ? "#F59E0B" : "#EF4444";
+  const dashOffset = circumference - (pct / 100) * circumference;
+  const color = v <= 3 ? "#10B981" : v <= 6 ? "#F59E0B" : "#EF4444";
 
   return (
     <div className="relative w-24 h-24 mx-auto">
@@ -41,97 +46,30 @@ function ConfidenceGauge({ value }: { value: number | null | undefined }) {
           strokeDasharray={circumference} strokeDashoffset={dashOffset} strokeLinecap="round" />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-foreground">{value != null ? `${value}%` : "..."}</span>
-        <span className="text-[9px] text-muted-foreground">confidence</span>
+        <span className="text-2xl font-bold text-foreground">{score != null ? score : "\u2014"}</span>
+        <span className="text-[9px] text-muted-foreground">/ 10 risk</span>
       </div>
     </div>
   );
 }
 
-type JurisdictionStatus = "compliant" | "action_required" | "warning" | "not_applicable";
-
-function JStatusIcon({ status, size = 12 }: { status: JurisdictionStatus; size?: number }) {
-  switch (status) {
-    case "compliant": return <CheckCircle2 size={size} className="text-emerald-500 shrink-0" />;
-    case "action_required": return <AlertTriangle size={size} className="text-amber-500 shrink-0" />;
-    case "warning": return <Info size={size} className="text-amber-500 shrink-0" />;
-    case "not_applicable": return <span className="text-[10px] text-muted-foreground/50 shrink-0">N/A</span>;
-  }
-}
-
-const statusLabelMap: Record<JurisdictionStatus, { text: string; color: string }> = {
-  compliant: { text: "Compliant", color: "text-emerald-600 dark:text-emerald-400" },
-  action_required: { text: "Action Required", color: "text-amber-600 dark:text-amber-400" },
-  warning: { text: "Review Needed", color: "text-amber-600 dark:text-amber-400" },
-  not_applicable: { text: "N/A", color: "text-muted-foreground" },
-};
-
-const sectionIcons: Record<string, typeof MapPin> = {
-  zoning: MapPin, "building-code": Building2, landmark: Landmark,
-  "coop-hoa": Home, environmental: Leaf, permits: FileText,
-};
-
-function JurisdictionSectionCard({ section }: { section: any }) {
-  const [expanded, setExpanded] = useState(false);
-  const SectionIcon = sectionIcons[section.id] || Scale;
-  const sl = statusLabelMap[section.overallStatus as JurisdictionStatus] ?? statusLabelMap.compliant;
-  const items: any[] = section.items ?? [];
-  const actionCount = items.filter((i: any) => i.status === "action_required" || i.status === "warning").length;
+function RiskLevelBadge({ level }: { level: string | null | undefined }) {
+  if (!level) return null;
+  const l = level.toUpperCase();
+  const colors =
+    l === "LOW" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" :
+    l === "MODERATE" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" :
+    l === "HIGH" ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" :
+    "bg-red-200 text-red-900 dark:bg-red-900/40 dark:text-red-300";
 
   return (
-    <div className="border-b border-border/20 last:border-b-0">
-      <button onClick={() => setExpanded(!expanded)} className="flex items-center justify-between w-full py-3 text-left">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-md bg-[#1E3A5F]/5 dark:bg-[#1E3A5F]/20 flex items-center justify-center shrink-0">
-            <SectionIcon size={14} className="text-[#1E3A5F] dark:text-[#6BA3D6]" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-foreground">{section.title}</p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className={`text-[10px] font-medium ${sl.color}`}>{sl.text}</span>
-              {actionCount > 0 && section.overallStatus !== "compliant" && (
-                <span className="text-[10px] text-muted-foreground">&middot; {actionCount} item{actionCount > 1 ? "s" : ""}</span>
-              )}
-            </div>
-          </div>
-        </div>
-        {expanded ? <ChevronUp size={14} className="text-muted-foreground shrink-0" /> : <ChevronDown size={14} className="text-muted-foreground shrink-0" />}
-      </button>
-
-      {expanded && (
-        <div className="pb-3 space-y-1.5">
-          {items.map((item: any, idx: number) => (
-            <div key={idx} className="rounded-md bg-muted/30 px-3 py-2">
-              <div className="flex items-start gap-2">
-                <div className="mt-0.5"><JStatusIcon status={item.status} /></div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-[11px] text-muted-foreground">{item.label}</span>
-                    <span className="text-[11px] font-medium text-foreground text-right shrink-0">{item.value}</span>
-                  </div>
-                  {item.detail && <p className="text-[10px] text-muted-foreground leading-relaxed mt-1">{item.detail}</p>}
-                </div>
-              </div>
-            </div>
-          ))}
-          {section.note && (
-            <div className={`rounded-lg border p-2.5 mt-1 ${
-              section.overallStatus === "compliant" ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/40" :
-              section.overallStatus === "action_required" ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/40" :
-              "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/40"
-            }`}>
-              <p className={`text-[10px] font-medium leading-relaxed ${
-                section.overallStatus === "compliant" ? "text-emerald-700 dark:text-emerald-400" :
-                section.overallStatus === "action_required" ? "text-amber-700 dark:text-amber-400" :
-                "text-blue-700 dark:text-blue-400"
-              }`}>{section.note}</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide ${colors}`}>
+      {l}
+    </span>
   );
 }
+
+// ── Page ─────────────────────────────────────────────────────────────────
 
 export default function ReadinessReportPage() {
   const params = useParams();
@@ -145,7 +83,7 @@ export default function ReadinessReportPage() {
   useEffect(() => {
     async function fetchReport() {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
         const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}`);
         if (!res.ok) throw new Error(`Failed to load report: ${res.status}`);
         const data = await res.json();
@@ -183,209 +121,538 @@ export default function ReadinessReportPage() {
     );
   }
 
-  // Extract data with null guards
-  const r = report;
-  const confidence = r.feasibility_confidence ?? r.confidence ?? null;
-  const confidenceRange = r.confidence_range ?? {};
-  const costBreakdown: any[] = r.cost_breakdown ?? r.costBreakdown ?? [];
-  const timelineScenarios: any[] = r.timeline_scenarios ?? r.timelineScenarios ?? [];
-  const jurisdictionSections: any[] = r.jurisdiction_sections ?? r.jurisdictionSections ?? r.jurisdiction ?? [];
-  const confidenceDrivers: any[] = r.confidence_drivers ?? r.confidenceDrivers ?? [];
-  const deliveryModel = r.delivery_model ?? r.deliveryModel ?? null;
-  const aiInsight = r.ai_insight ?? r.aiInsight ?? r.summary ?? r.narrative ?? null;
-  const projectTitle = r.project_title ?? r.projectTitle ?? r.title ?? "Renovation";
+  // ── Extract from report.report_json ─────────────────────────────────
+  const rj = report?.report_json ?? {};
+  const formData = report?.form_data ?? report?.intake_data ?? {};
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
 
-  const totalLow = costBreakdown.reduce((s: number, c: any) => s + (c.low ?? 0), 0);
-  const totalMid = costBreakdown.reduce((s: number, c: any) => s + (c.mid ?? c.estimate ?? 0), 0);
-  const totalHigh = costBreakdown.reduce((s: number, c: any) => s + (c.high ?? 0), 0);
-  const totalCost = r.total_cost ?? r.totalCost ?? (totalMid > 0 ? totalMid : null);
+  // Cost estimate
+  const costEst = rj?.cost_estimate ?? {};
+  const costDist = costEst?.cost_distribution ?? {};
+  const schedDist = costEst?.schedule_distribution ?? {};
+  const p10Cost = costDist?.p10 ?? null;
+  const p25Cost = costDist?.p25 ?? null;
+  const p50Cost = costDist?.p50 ?? null;
+  const p75Cost = costDist?.p75 ?? null;
+  const p90Cost = costDist?.p90 ?? null;
+  const p50Days = schedDist?.p50 ?? null;
+  const p10Days = schedDist?.p10 ?? null;
+  const p90Days = schedDist?.p90 ?? null;
+  const contingencyPct = costEst?.contingency_pct ?? null;
+  const confidenceDesc = costEst?.confidence_interval_description ?? null;
+  const methodologyNotes: string[] = costEst?.methodology_notes ?? [];
+  const sourceAttribution = costEst?.source_attribution ?? null;
+  const comparableCount = costEst?.comparable_projects_count ?? null;
 
-  const timelineWeeks = r.timeline_weeks ?? r.timelineWeeks ?? (timelineScenarios.find((s: any) => s.label === "Most Likely")?.weeks) ?? null;
-  const roi = r.roi ?? r.estimated_roi ?? null;
+  // Risk assessment
+  const riskAssessment = rj?.risk_assessment ?? {};
+  const compositeScore = riskAssessment?.composite_score ?? null;
+  const riskLevel = riskAssessment?.risk_level ?? null;
+  const dimensionScores: any[] = riskAssessment?.dimension_scores ?? [];
+  const riskMitigations: string[] = riskAssessment?.mitigations ?? [];
+
+  // Regulatory
+  const regData = rj?.regulatory_data ?? {};
+  const permitsRequired: string[] = regData?.permits_required ?? [];
+  const regTimelineImpact = regData?.estimated_timeline_impact_days ?? null;
+  const regWarnings: string[] = regData?.warnings ?? [];
+  const inspectionsRequired: string[] = regData?.inspections_required ?? [];
+  const coopApproval = regData?.coop_board_approval ?? null;
+  const noiseRestrictions = regData?.noise_restrictions ?? null;
+
+  // Contractor guidance
+  const contractorGuidance = rj?.contractor_guidance ?? {};
+  const recommendedHires: string[] = contractorGuidance?.recommended_hires ?? [];
+  const vettingCriteria: string[] = contractorGuidance?.vetting_criteria ?? [];
+  const redFlags: string[] = contractorGuidance?.red_flags ?? [];
+
+  // Other sections
+  const executiveSummary = rj?.executive_summary ?? null;
+  const scopeAnalysis = rj?.scope_analysis ?? null;
+  const marketContext = rj?.market_context ?? null;
+  const nextSteps: string[] = rj?.next_steps ?? [];
+
+  // Calibration / provenance
+  const calibration = rj?.calibration ?? {};
+  const provenance = rj?.provenance ?? {};
+  const historicalAccuracy = calibration?.historical_accuracy_pct ?? null;
+
+  // Timeline in weeks
+  const timelineWeeks = daysToWeeks(p50Days);
+  const timelineRangeLow = daysToWeeks(p10Days);
+  const timelineRangeHigh = daysToWeeks(p90Days);
+
+  // Project title from form data
+  const homeType = formData?.home_type ?? formData?.homeType ?? formData?.property_type ?? "Renovation";
+  const scope: string[] = formData?.scope ?? formData?.renovation_scope ?? [];
+  const projectLabel = scope.length > 0
+    ? `${scope.map((s: string) => s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, " ")).join(", ")} \u2014 ${homeType}`
+    : homeType;
 
   return (
     <div>
       <PageHeader
         title="Readiness Report"
-        subtitle={`${projectTitle} — Feasibility Analysis`}
-        backPath="/dashboard"
+        subtitle={`${projectLabel} \u2014 Feasibility Analysis`}
+        backPath="/"
         rightAction={
-          <Button variant="ghost" size="sm" className="text-xs gap-1.5">
-            <Download size={14} /> PDF
-          </Button>
+          <a
+            href={`${apiUrl}/v1/readiness-reports/${reportId}/html`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button variant="ghost" size="sm" className="text-xs gap-1.5">
+              <Download size={14} /> PDF
+            </Button>
+          </a>
         }
       />
 
-      <div className="px-4 pt-4 pb-4 max-w-3xl mx-auto">
-        {/* Feasibility Confidence */}
+      <div className="px-4 pt-4 pb-8 max-w-3xl mx-auto">
+
+        {/* ── Executive Summary ─────────────────────────────────────── */}
+        {executiveSummary && (
+          <Card className="p-4 mb-4 border-l-4 border-l-[#1E3A5F]">
+            <div className="flex items-center gap-2 mb-2">
+              <Info size={14} className="text-[#1E3A5F]" />
+              <h3 className="text-xs font-semibold text-[#1E3A5F] uppercase tracking-wider">Executive Summary</h3>
+            </div>
+            <p className="text-xs text-foreground leading-relaxed">{executiveSummary}</p>
+          </Card>
+        )}
+
+        {/* ── Risk / Feasibility Score ─────────────────────────────── */}
         <Card className="p-4 mb-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Feasibility Confidence</h3>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Feasibility & Risk Assessment
+            </h3>
+            <RiskLevelBadge level={riskLevel} />
           </div>
+
           <div className="flex items-center gap-4">
-            <ConfidenceGauge value={confidence} />
+            <RiskScoreGauge score={compositeScore} />
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Target size={12} className="text-[#1E3A5F] dark:text-[#6BA3D6]" />
-                <span className="text-[11px] font-semibold text-foreground">
-                  Range: {confidenceRange.low ?? "..."}% – {confidenceRange.high ?? "..."}%
-                </span>
-              </div>
-              <p className="text-[10px] text-muted-foreground leading-relaxed">
-                Based on scope complexity, local market data, and comparable project outcomes.
-              </p>
+              {confidenceDesc && (
+                <p className="text-[11px] font-semibold text-foreground mb-1">{confidenceDesc}</p>
+              )}
+              {historicalAccuracy != null && (
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Target size={12} className="text-[#1E3A5F] dark:text-[#6BA3D6]" />
+                  <span className="text-[11px] text-muted-foreground">
+                    Historical accuracy: {historicalAccuracy}%
+                  </span>
+                </div>
+              )}
+              {comparableCount != null && (
+                <p className="text-[10px] text-muted-foreground">
+                  Based on {comparableCount} comparable project{comparableCount !== 1 ? "s" : ""}
+                </p>
+              )}
             </div>
           </div>
 
-          {confidenceDrivers.length > 0 && (
+          {/* Dimension scores */}
+          {dimensionScores.length > 0 && (
             <div className="mt-3 pt-3 border-t border-border/30">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">What drives this score</p>
-              <div className="space-y-1.5">
-                {confidenceDrivers.map((d: any) => (
-                  <div key={d.label} className="flex items-center gap-2">
-                    <span className="text-[11px] text-muted-foreground w-[120px] shrink-0">{d.label}</span>
-                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${(d.value ?? 0) >= 75 ? "bg-emerald-500" : (d.value ?? 0) >= 60 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${d.value ?? 0}%` }} />
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                Risk Dimensions
+              </p>
+              <div className="space-y-2">
+                {dimensionScores.map((d: any) => (
+                  <div key={d.name}>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-[11px] text-foreground font-medium w-[140px] shrink-0 capitalize">
+                        {(d.name ?? "").replace(/_/g, " ")}
+                      </span>
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            (d.score ?? 0) <= 3 ? "bg-emerald-500" :
+                            (d.score ?? 0) <= 6 ? "bg-amber-500" : "bg-red-500"
+                          }`}
+                          style={{ width: `${((d.score ?? 0) / 10) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-bold text-foreground w-8 text-right">
+                        {d.score ?? 0}/10
+                      </span>
                     </div>
-                    <span className="text-[10px] font-medium text-foreground w-8 text-right">{d.value ?? 0}%</span>
+                    {d.explanation && (
+                      <p className="text-[10px] text-muted-foreground leading-relaxed ml-[148px]">{d.explanation}</p>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
           )}
+
+          {/* Risk mitigations */}
+          {riskMitigations.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-border/30">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                Recommended Mitigations
+              </p>
+              <ul className="space-y-1">
+                {riskMitigations.map((m, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <CheckCircle2 size={10} className="text-emerald-500 mt-0.5 shrink-0" />
+                    <span className="text-[11px] text-foreground leading-relaxed">{m}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </Card>
 
-        {/* Key Metrics Row */}
+        {/* ── Key Metrics Row ──────────────────────────────────────── */}
         <div className="grid grid-cols-3 gap-2.5 mb-4">
           <Card className="p-3 text-center">
             <Clock size={16} className="mx-auto text-[#1E3A5F] dark:text-[#6BA3D6] mb-1" />
-            <p className="text-lg font-bold text-foreground">{timelineWeeks ?? "..."}</p>
+            <p className="text-lg font-bold text-foreground">{timelineWeeks ?? "\u2014"}</p>
             <p className="text-[10px] text-muted-foreground">weeks (likely)</p>
+            {timelineRangeLow != null && timelineRangeHigh != null && (
+              <p className="text-[9px] text-muted-foreground mt-0.5">range: {timelineRangeLow}\u2013{timelineRangeHigh}w</p>
+            )}
           </Card>
           <Card className="p-3 text-center">
             <DollarSign size={16} className="mx-auto text-emerald-600 dark:text-emerald-400 mb-1" />
-            <p className="text-lg font-bold text-foreground">{totalCost != null ? fmtK(totalCost) : "..."}</p>
+            <p className="text-lg font-bold text-foreground">{formatCurrencyK(p50Cost)}</p>
             <p className="text-[10px] text-muted-foreground">most likely</p>
+            {p10Cost != null && p90Cost != null && (
+              <p className="text-[9px] text-muted-foreground mt-0.5">{formatCurrencyK(p10Cost)}\u2013{formatCurrencyK(p90Cost)}</p>
+            )}
           </Card>
           <Card className="p-3 text-center">
             <TrendingUp size={16} className="mx-auto text-cyan-600 dark:text-cyan-400 mb-1" />
-            <p className="text-lg font-bold text-foreground">{roi != null ? `${roi}x` : "..."}</p>
-            <p className="text-[10px] text-muted-foreground">est. ROI</p>
+            <p className="text-lg font-bold text-foreground">
+              {p10Cost != null && p90Cost != null ? `${formatCurrencyK(p10Cost)}\u2013${formatCurrencyK(p90Cost)}` : "\u2014"}
+            </p>
+            <p className="text-[10px] text-muted-foreground">est. range (80% CI)</p>
           </Card>
         </div>
 
-        {/* Timeline Scenarios */}
-        {timelineScenarios.length > 0 && (
-          <Card className="p-4 mb-4">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Timeline Scenarios</h3>
-            <div className="space-y-2.5">
-              {timelineScenarios.map((s: any) => {
-                const barColor = s.label === "Best Case" ? "bg-emerald-500" :
-                  s.label === "Most Likely" ? "bg-[#1E3A5F] dark:bg-[#6BA3D6]" :
-                  s.label === "Conservative" ? "bg-amber-500" : "bg-red-500";
-                return (
-                  <div key={s.label}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] font-semibold text-foreground">{s.label}</span>
-                      <span className="text-xs font-bold text-foreground">{s.weeks ?? "..."}w</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${(s.probability ?? 0) * 2}%` }} />
-                      </div>
-                      <span className="text-[10px] font-medium text-muted-foreground w-8 text-right">{s.probability ?? 0}%</span>
-                    </div>
-                  </div>
-                );
-              })}
+        {/* ── Cost Estimate ────────────────────────────────────────── */}
+        <Card className="p-4 mb-4">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            Cost Estimate
+          </h3>
+
+          {/* Cost distribution bar */}
+          <div className="rounded-lg bg-[#1E3A5F]/5 dark:bg-[#1E3A5F]/20 p-3 mb-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-medium text-muted-foreground">Most Likely (P50)</span>
+              <span className="text-sm font-bold text-[#1E3A5F] dark:text-[#6BA3D6]">{formatCurrency(p50Cost)}</span>
             </div>
-          </Card>
-        )}
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+              <span>80% confidence range</span>
+              <span className="font-medium text-foreground">{formatCurrency(p10Cost)} \u2013 {formatCurrency(p90Cost)}</span>
+            </div>
+          </div>
 
-        {/* Cost Breakdown */}
-        {costBreakdown.length > 0 && (
-          <Card className="p-4 mb-4">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Cost Breakdown</h3>
+          {/* P-values visualization */}
+          <div className="space-y-2 mb-3">
+            {[
+              { label: "Optimistic (P10)", value: p10Cost, pct: 10 },
+              { label: "Low (P25)", value: p25Cost, pct: 25 },
+              { label: "Most Likely (P50)", value: p50Cost, pct: 50 },
+              { label: "High (P75)", value: p75Cost, pct: 75 },
+              { label: "Conservative (P90)", value: p90Cost, pct: 90 },
+            ].filter(d => d.value != null).map((d) => {
+              const maxVal = p90Cost || 1;
+              const barWidth = Math.min(100, ((d.value ?? 0) / maxVal) * 100);
+              const barColor = d.pct <= 25 ? "bg-emerald-500" : d.pct <= 50 ? "bg-[#1E3A5F] dark:bg-[#6BA3D6]" : d.pct <= 75 ? "bg-amber-500" : "bg-red-400";
+              return (
+                <div key={d.label}>
+                  <div className="flex items-center justify-between text-[11px] mb-0.5">
+                    <span className="text-muted-foreground">{d.label}</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(d.value)}</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${barColor}`} style={{ width: `${barWidth}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-            <div className="rounded-lg bg-[#1E3A5F]/5 dark:bg-[#1E3A5F]/20 p-2.5 mb-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium text-muted-foreground">Total Estimated Cost</span>
-                <span className="text-sm font-bold text-[#1E3A5F] dark:text-[#6BA3D6]">{fmt(totalCost)}</span>
+          {/* Schedule distribution */}
+          {p50Days != null && (
+            <div className="rounded-lg bg-muted/30 p-3 mb-3">
+              <p className="text-[11px] font-semibold text-foreground mb-1">Schedule Estimate</p>
+              <div className="grid grid-cols-3 gap-3 text-center text-[10px]">
+                <div>
+                  <p className="font-bold text-foreground">{daysToWeeks(p10Days) ?? "\u2014"}w</p>
+                  <p className="text-muted-foreground">Best case</p>
+                </div>
+                <div>
+                  <p className="font-bold text-[#1E3A5F] dark:text-[#6BA3D6] text-sm">{daysToWeeks(p50Days) ?? "\u2014"}w</p>
+                  <p className="text-muted-foreground">Most likely</p>
+                </div>
+                <div>
+                  <p className="font-bold text-foreground">{daysToWeeks(p90Days) ?? "\u2014"}w</p>
+                  <p className="text-muted-foreground">Conservative</p>
+                </div>
               </div>
-              {totalLow > 0 && totalHigh > 0 && (
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-[10px] text-muted-foreground">90% confidence range</span>
-                  <span className="text-[11px] font-medium text-foreground">{fmt(totalLow)} – {fmt(totalHigh)}</span>
+            </div>
+          )}
+
+          {/* Contingency */}
+          {contingencyPct != null && (
+            <div className="flex items-center justify-between text-[11px] py-2 border-t border-border/30">
+              <span className="text-muted-foreground">Contingency</span>
+              <span className="font-semibold text-foreground">{Math.round(contingencyPct * 100)}%</span>
+            </div>
+          )}
+
+          {/* Methodology notes */}
+          {methodologyNotes.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-border/30">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Methodology</p>
+              <ul className="space-y-0.5">
+                {methodologyNotes.map((note, i) => (
+                  <li key={i} className="text-[10px] text-muted-foreground leading-relaxed flex items-start gap-1.5">
+                    <span className="text-muted-foreground/50 mt-0.5">&bull;</span> {note}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Source attribution */}
+          {sourceAttribution && (
+            <p className="text-[9px] text-muted-foreground/70 mt-2 italic">{sourceAttribution}</p>
+          )}
+        </Card>
+
+        {/* ── Scope Analysis ───────────────────────────────────────── */}
+        {scopeAnalysis && (
+          <Card className="p-4 mb-4">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Scope Analysis</h3>
+            <p className="text-xs text-foreground leading-relaxed">{scopeAnalysis}</p>
+          </Card>
+        )}
+
+        {/* ── Regulatory Section ───────────────────────────────────── */}
+        {(permitsRequired.length > 0 || regWarnings.length > 0 || coopApproval?.required) && (
+          <Card className="p-4 mb-4">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Regulatory & Permits
+            </h3>
+
+            {/* Timeline impact */}
+            {regTimelineImpact != null && regTimelineImpact > 0 && (
+              <div className="flex items-center gap-2 mb-3 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-800/40">
+                <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+                <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+                  Estimated permit timeline impact: {regTimelineImpact} days ({Math.round(regTimelineImpact / 7)} weeks)
+                </p>
+              </div>
+            )}
+
+            {/* Permits required */}
+            {permitsRequired.length > 0 && (
+              <div className="mb-3">
+                <p className="text-[10px] font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
+                  <FileText size={12} className="text-[#1E3A5F]" /> Permits Required
+                </p>
+                <ul className="space-y-1">
+                  {permitsRequired.map((p, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <CheckCircle2 size={10} className="text-[#1E3A5F] mt-0.5 shrink-0" />
+                      <span className="text-[11px] text-foreground">{p}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Warnings */}
+            {regWarnings.length > 0 && (
+              <div className="mb-3">
+                <p className="text-[10px] font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
+                  <AlertCircle size={12} className="text-amber-500" /> Warnings
+                </p>
+                <ul className="space-y-1">
+                  {regWarnings.map((w, i) => (
+                    <li key={i} className="flex items-start gap-2 p-2 rounded-md bg-amber-50/50 dark:bg-amber-950/20">
+                      <AlertTriangle size={10} className="text-amber-500 mt-0.5 shrink-0" />
+                      <span className="text-[11px] text-foreground leading-relaxed">{w}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Co-op board approval */}
+            {coopApproval?.required && (
+              <div className="mb-3 p-3 rounded-lg bg-[#1E3A5F]/5 dark:bg-[#1E3A5F]/20">
+                <p className="text-[11px] font-semibold text-foreground mb-1">Co-op Board Approval Required</p>
+                {coopApproval.typical_weeks && (
+                  <p className="text-[10px] text-muted-foreground">Typical timeline: {coopApproval.typical_weeks} weeks</p>
+                )}
+                {(coopApproval.requirements?.length ?? 0) > 0 && (
+                  <ul className="mt-1.5 space-y-0.5">
+                    {coopApproval.requirements.map((r: string, i: number) => (
+                      <li key={i} className="text-[10px] text-muted-foreground flex items-start gap-1.5">
+                        <span>&bull;</span> {r}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Noise restrictions */}
+            {noiseRestrictions && (
+              <div className="mb-3">
+                <p className="text-[10px] font-semibold text-foreground mb-1">Noise Restrictions</p>
+                <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
+                  {noiseRestrictions.weekday_hours && <div>Weekday: <span className="text-foreground font-medium">{noiseRestrictions.weekday_hours}</span></div>}
+                  {noiseRestrictions.weekend_hours && <div>Weekend: <span className="text-foreground font-medium">{noiseRestrictions.weekend_hours}</span></div>}
+                  {noiseRestrictions.holidays && <div className="col-span-2">Holidays: <span className="text-foreground font-medium">{noiseRestrictions.holidays}</span></div>}
+                </div>
+              </div>
+            )}
+
+            {/* Inspections */}
+            {inspectionsRequired.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold text-foreground mb-1">Inspections Required</p>
+                <ul className="space-y-0.5">
+                  {inspectionsRequired.map((insp, i) => (
+                    <li key={i} className="text-[10px] text-muted-foreground flex items-start gap-1.5">
+                      <span>&bull;</span> {insp}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* ── Contractor Guidance ──────────────────────────────────── */}
+        {(recommendedHires.length > 0 || vettingCriteria.length > 0 || redFlags.length > 0) && (
+          <Card className="p-4 mb-4">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Contractor Guidance
+            </h3>
+
+            {recommendedHires.length > 0 && (
+              <div className="mb-3">
+                <p className="text-[10px] font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
+                  <Users size={12} className="text-[#1E3A5F]" /> Recommended Hires
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {recommendedHires.map((h, i) => (
+                    <span key={i} className="inline-flex items-center px-2.5 py-1 rounded-lg bg-[#1E3A5F]/5 dark:bg-[#1E3A5F]/20 text-[11px] font-medium text-foreground">
+                      {h}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {vettingCriteria.length > 0 && (
+              <div className="mb-3">
+                <p className="text-[10px] font-semibold text-foreground mb-1.5">Vetting Criteria</p>
+                <ul className="space-y-1">
+                  {vettingCriteria.map((c, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Shield size={10} className="text-emerald-500 mt-0.5 shrink-0" />
+                      <span className="text-[11px] text-foreground leading-relaxed">{c}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {redFlags.length > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold text-red-600 dark:text-red-400 mb-1.5">Red Flags to Watch</p>
+                <ul className="space-y-1">
+                  {redFlags.map((f, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <AlertTriangle size={10} className="text-red-500 mt-0.5 shrink-0" />
+                      <span className="text-[11px] text-foreground leading-relaxed">{f}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* ── Market Context ───────────────────────────────────────── */}
+        {marketContext && (
+          <Card className="p-4 mb-4">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Market Context</h3>
+            <p className="text-xs text-foreground leading-relaxed">{marketContext}</p>
+          </Card>
+        )}
+
+        {/* ── Next Steps ───────────────────────────────────────────── */}
+        {nextSteps.length > 0 && (
+          <Card className="p-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <ListChecks size={14} className="text-[#1E3A5F]" />
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Next Steps</h3>
+            </div>
+            <ol className="space-y-2">
+              {nextSteps.map((step, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-[#1E3A5F] text-white text-[10px] font-bold shrink-0 mt-0.5">
+                    {i + 1}
+                  </span>
+                  <span className="text-xs text-foreground leading-relaxed">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </Card>
+        )}
+
+        {/* ── Provenance ───────────────────────────────────────────── */}
+        {(provenance?.pipeline_version || (provenance?.data_sources?.length ?? 0) > 0 || provenance?.generated_at) && (
+          <Card className="p-4 mb-4 bg-muted/20">
+            <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Data Provenance</h3>
+            <div className="space-y-1 text-[10px] text-muted-foreground">
+              {provenance.pipeline_version && (
+                <p>Pipeline version: <span className="font-medium text-foreground">{provenance.pipeline_version}</span></p>
+              )}
+              {provenance.generated_at && (
+                <p>Generated: <span className="font-medium text-foreground">{new Date(provenance.generated_at).toLocaleString()}</span></p>
+              )}
+              {(provenance.data_sources?.length ?? 0) > 0 && (
+                <div>
+                  <p className="mb-0.5">Data sources:</p>
+                  <ul className="ml-2 space-y-0.5">
+                    {provenance.data_sources.map((src: string, i: number) => (
+                      <li key={i} className="flex items-start gap-1">
+                        <span className="text-muted-foreground/50">&bull;</span>
+                        <span className="text-foreground">{src}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {provenance.confidence_scores && (
+                <div>
+                  <p className="mb-0.5">Confidence by node:</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 ml-2">
+                    {Object.entries(provenance.confidence_scores).map(([node, score]) => (
+                      <div key={node} className="flex justify-between">
+                        <span className="capitalize">{node.replace(/_/g, " ")}</span>
+                        <span className="font-medium text-foreground">{typeof score === "number" ? `${Math.round(score * 100)}%` : String(score)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
-
-            <div className="space-y-3">
-              {costBreakdown.map((item: any) => (
-                <div key={item.label}>
-                  <div className="flex items-center justify-between text-xs mb-0.5">
-                    <span className="text-muted-foreground">{item.label}</span>
-                    <span className="font-semibold text-foreground">{fmt(item.mid ?? item.estimate)}</span>
-                  </div>
-                  {(item.low != null || item.high != null) && (
-                    <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
-                      <span>Range: {fmt(item.low)} – {fmt(item.high)}</span>
-                      {item.confidence != null && (
-                        <span className={`font-medium ${
-                          item.confidence >= 85 ? "text-emerald-600 dark:text-emerald-400" :
-                          item.confidence >= 75 ? "text-amber-600 dark:text-amber-400" :
-                          "text-red-600 dark:text-red-400"
-                        }`}>{item.confidence}% conf.</span>
-                      )}
-                    </div>
-                  )}
-                  <div className="relative h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="absolute inset-y-0 left-0 bg-[#1E3A5F] dark:bg-[#6BA3D6] rounded-full"
-                      style={{ width: `${item.pct ?? Math.min(100, ((item.mid ?? item.estimate ?? 0) / (totalCost || 1)) * 100)}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
           </Card>
         )}
 
-        {/* Jurisdiction & Zoning */}
-        {jurisdictionSections.length > 0 && (
-          <Card className="p-4 mb-4">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Jurisdiction & Zoning Overview</h3>
-            <div className="divide-y divide-border/20">
-              {jurisdictionSections.map((section: any, i: number) => (
-                <JurisdictionSectionCard key={section.id ?? i} section={section} />
-              ))}
-            </div>
-          </Card>
-        )}
-
-        {/* Delivery Model */}
-        {deliveryModel && (
-          <Card className="p-4 mb-4">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Recommended Delivery Model</h3>
-            <div className="bg-[#1E3A5F]/5 dark:bg-[#1E3A5F]/20 rounded-xl p-3">
-              <p className="text-sm font-semibold text-foreground">{deliveryModel.name ?? deliveryModel}</p>
-              {deliveryModel.description && (
-                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{deliveryModel.description}</p>
-              )}
-            </div>
-          </Card>
-        )}
-
-        {/* AI Insight */}
-        {aiInsight && (
-          <Card className="p-4 border-l-4 border-l-[#2BCBBA] mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Info size={14} className="text-[#2BCBBA]" />
-              <h3 className="text-xs font-semibold text-[#2BCBBA]">AI Insight</h3>
-            </div>
-            <p className="text-xs text-foreground leading-relaxed">{aiInsight}</p>
-          </Card>
-        )}
-
-        {/* CTA */}
+        {/* ── CTA ──────────────────────────────────────────────────── */}
         <Button
           onClick={() => router.push("/services")}
           className="w-full h-12 text-sm font-semibold bg-[#1E3A5F] hover:bg-[#1E3A5F]/90 dark:bg-[#6BA3D6] dark:hover:bg-[#6BA3D6]/90 dark:text-[#0f1c2e] gap-2"

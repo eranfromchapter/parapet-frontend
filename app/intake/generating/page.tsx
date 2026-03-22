@@ -50,12 +50,12 @@ function GeneratingContent() {
   const pollReport = useCallback(async () => {
     if (!reportId || redirected.current) return;
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
       const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}`);
       if (!res.ok) throw new Error(`Status ${res.status}`);
       const data = await res.json();
 
-      if (data.status === "completed" || data.report || data.feasibility_confidence != null) {
+      if (data.status === "completed" || data.report_json != null) {
         redirected.current = true;
         router.push(`/readiness/${reportId}`);
         return;
