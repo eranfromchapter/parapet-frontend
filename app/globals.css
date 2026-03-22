@@ -2,12 +2,238 @@
 @tailwind components;
 @tailwind utilities;
 
+/* PARAPET Brand Design System
+   Brand: "The Fiduciary Interface" — pre-war architectural firm meets high-res retina screen
+   Colors: 60% Anchor Navy / 30% Clarity White / 10% Accents
+   Fonts: Inter (UI) + Merriweather (Documents)
+*/
+
 :root {
-  --background: #ffffff;
-  --foreground: #0F172A;
+  --button-outline: rgba(0,0,0, .10);
+  --badge-outline: rgba(0,0,0, .05);
+  --opaque-button-border-intensity: -8;
+  --elevate-1: rgba(0,0,0, .03);
+  --elevate-2: rgba(0,0,0, .08);
+
+  /* PARAPET Light Mode — Clarity White backgrounds, Anchor Navy accents */
+  --background: 220 20% 98%;
+  --foreground: 214 35% 24%;
+  --border: 214 12% 88%;
+  --card: 0 0% 100%;
+  --card-foreground: 214 35% 24%;
+  --card-border: 214 12% 90%;
+  --sidebar: 214 35% 24%;
+  --sidebar-foreground: 220 20% 98%;
+  --sidebar-border: 214 30% 20%;
+  --sidebar-primary: 214 50% 24%;
+  --sidebar-primary-foreground: 220 20% 98%;
+  --sidebar-accent: 214 30% 30%;
+  --sidebar-accent-foreground: 220 20% 98%;
+  --sidebar-ring: 214 50% 24%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 214 35% 24%;
+  --popover-border: 214 12% 88%;
+
+  /* Primary = Anchor Navy #1E3A5F */
+  --primary: 214 52% 24%;
+  --primary-foreground: 220 20% 98%;
+
+  /* Secondary = Light slate */
+  --secondary: 214 15% 93%;
+  --secondary-foreground: 214 35% 24%;
+
+  --muted: 214 12% 94%;
+  --muted-foreground: 215 8% 46%;
+
+  --accent: 214 15% 93%;
+  --accent-foreground: 214 35% 24%;
+
+  /* Destructive */
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+
+  --input: 214 12% 82%;
+  --ring: 214 52% 24%;
+
+  /* Chart colors from brand palette */
+  --chart-1: 214 52% 24%;
+  --chart-2: 171 97% 43%;
+  --chart-3: 160 59% 51%;
+  --chart-4: 38 92% 50%;
+  --chart-5: 0 0% 29%;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-serif: 'Merriweather', Georgia, serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius: 0.625rem;
+
+  --shadow-2xs: 0 1px 2px rgba(30,58,95,0.04);
+  --shadow-xs: 0 1px 3px rgba(30,58,95,0.06);
+  --shadow-sm: 0 2px 4px rgba(30,58,95,0.06), 0 1px 2px rgba(30,58,95,0.04);
+  --shadow: 0 4px 8px rgba(30,58,95,0.06), 0 2px 4px rgba(30,58,95,0.04);
+  --shadow-md: 0 6px 16px rgba(30,58,95,0.08), 0 2px 6px rgba(30,58,95,0.04);
+  --shadow-lg: 0 12px 32px rgba(30,58,95,0.10), 0 4px 8px rgba(30,58,95,0.04);
+  --shadow-xl: 0 20px 40px rgba(30,58,95,0.12), 0 8px 16px rgba(30,58,95,0.06);
+  --shadow-2xl: 0 24px 48px rgba(30,58,95,0.16);
+
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+
+  /* PARAPET semantic colors */
+  --parapet-navy: #1E3A5F;
+  --parapet-white: #FAFBFC;
+  --parapet-graphite: #4A4A4A;
+  --parapet-slate: #64748B;
+  --parapet-amber: #F59E0B;
+  --parapet-green: #10B981;
+  --parapet-copper: #2BCBBA;
+
+  --sidebar-primary-border: hsl(var(--sidebar-primary));
+  --sidebar-accent-border: hsl(var(--sidebar-accent));
+  --primary-border: hsl(var(--primary));
+  --secondary-border: hsl(var(--secondary));
+  --muted-border: hsl(var(--muted));
+  --accent-border: hsl(var(--accent));
+  --destructive-border: hsl(var(--destructive));
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
+.dark {
+  --button-outline: rgba(255,255,255, .10);
+  --badge-outline: rgba(255,255,255, .05);
+  --opaque-button-border-intensity: 9;
+  --elevate-1: rgba(255,255,255, .04);
+  --elevate-2: rgba(255,255,255, .09);
+
+  --background: 214 30% 10%;
+  --foreground: 214 10% 92%;
+  --border: 214 15% 20%;
+  --card: 214 25% 13%;
+  --card-foreground: 214 10% 92%;
+  --card-border: 214 15% 18%;
+  --sidebar: 214 35% 8%;
+  --sidebar-foreground: 214 10% 92%;
+  --sidebar-border: 214 20% 15%;
+  --sidebar-primary: 214 40% 50%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-accent: 214 20% 20%;
+  --sidebar-accent-foreground: 214 10% 92%;
+  --sidebar-ring: 214 40% 50%;
+  --popover: 214 25% 14%;
+  --popover-foreground: 214 10% 92%;
+  --popover-border: 214 15% 20%;
+  --primary: 214 40% 50%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 214 15% 18%;
+  --secondary-foreground: 214 10% 92%;
+  --muted: 214 12% 20%;
+  --muted-foreground: 214 8% 55%;
+  --accent: 214 15% 18%;
+  --accent-foreground: 214 10% 92%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --input: 214 12% 28%;
+  --ring: 214 40% 50%;
+  --chart-1: 214 40% 55%;
+  --chart-2: 171 70% 55%;
+  --chart-3: 160 50% 55%;
+  --chart-4: 38 80% 60%;
+  --chart-5: 0 0% 55%;
+
+  --shadow-2xs: 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-xs: 0 1px 3px rgba(0,0,0,0.25);
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.25);
+  --shadow: 0 4px 8px rgba(0,0,0,0.3);
+  --shadow-md: 0 6px 16px rgba(0,0,0,0.35);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.4);
+  --shadow-xl: 0 20px 40px rgba(0,0,0,0.45);
+  --shadow-2xl: 0 24px 48px rgba(0,0,0,0.5);
+
+  --sidebar-primary-border: hsl(var(--sidebar-primary));
+  --sidebar-accent-border: hsl(var(--sidebar-accent));
+  --primary-border: hsl(var(--primary));
+  --secondary-border: hsl(var(--secondary));
+  --muted-border: hsl(var(--muted));
+  --accent-border: hsl(var(--accent));
+  --destructive-border: hsl(var(--destructive));
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+/* Mobile app frame */
+.mobile-frame {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Bottom nav styling */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 430px;
+  width: 100%;
+  z-index: 50;
+}
+
+/* Safe area padding */
+.safe-bottom {
+  padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Parapet brand gradient */
+.parapet-gradient {
+  background: linear-gradient(135deg, #1E3A5F 0%, #2A4F7A 50%, #1E3A5F 100%);
+}
+
+/* Status indicators */
+.status-verified { color: #10B981; }
+.status-warning { color: #F59E0B; }
+.status-flagged { color: #EF4444; }
+.status-pending { color: #64748B; }
+
+/* Confidence bar */
+.confidence-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: hsl(var(--muted));
+  overflow: hidden;
+}
+.confidence-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+/* Risk score ring */
+.risk-ring {
+  width: 56px;
+  height: 56px;
+}
+
+/* Scrollbar styling for mobile */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+@layer utilities {
+  input[type="search"]::-webkit-search-cancel-button {
+    @apply hidden;
+  }
+  [contenteditable][data-placeholder]:empty::before {
+    content: attr(data-placeholder);
+    color: hsl(var(--muted-foreground));
+    pointer-events: none;
+  }
 }

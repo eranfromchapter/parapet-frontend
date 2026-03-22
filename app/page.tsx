@@ -1,163 +1,177 @@
-import React from 'react';
-import Link from 'next/link';
-import { Header } from '@/components/layout/header';
-import { Footer } from '@/components/layout/footer';
-import { Button } from '@/components/ui/button';
-import { ArrowRight, TrendingUp, DollarSign, ShieldCheck, ClipboardCheck, BarChart3, FileText, Target, Lightbulb, Download, ListChecks } from 'lucide-react';
+import Link from "next/link";
+import ParapetLogo from "@/components/ParapetLogo";
+import { Button } from "@/components/ui/button";
+import {
+  Shield, Eye, Scale, Brain, BarChart3, Gavel,
+  Clock, DollarSign, Camera, ArrowRight, AlertTriangle,
+} from "lucide-react";
 
-export default function LandingPage() {
+const platformNumbers = [
+  { value: "37+", label: "AI-powered tools" },
+  { value: "7\u201314d", label: "Early delay alerts" },
+  { value: "100%", label: "Conflict-free" },
+];
+
+const coreCapabilities = [
+  {
+    icon: Brain,
+    title: "AI Readiness Assessment",
+    desc: "Know your project\u2019s feasibility, cost range, and risk profile before you spend a dollar.",
+  },
+  {
+    icon: BarChart3,
+    title: "Bid Normalization & Scoring",
+    desc: "Compare contractor bids apples-to-apples. AI flags scope gaps, pricing risks, and missing coverage.",
+  },
+  {
+    icon: Gavel,
+    title: "Contract Risk Analysis",
+    desc: "Every clause reviewed for liability, payment risk, and missing protections \u2014 in plain English.",
+  },
+  {
+    icon: Clock,
+    title: "Predictive Schedule Monitoring",
+    desc: "Delay alerts 7\u201314 days before impact. Recovery options with cost and risk trade-offs, not surprises.",
+  },
+  {
+    icon: DollarSign,
+    title: "Payment Guardrails & Lien Shield",
+    desc: "No payment releases without verified lien waivers. Your money stays protected at every milestone.",
+  },
+  {
+    icon: Camera,
+    title: "AI Defect Detection",
+    desc: "Computer vision catches quality issues your eyes might miss. Documented, tracked, and resolved.",
+  },
+];
+
+export default function WelcomePage() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-
+    <div className="min-h-screen flex flex-col bg-background">
       {/* Hero */}
-      <section className="bg-navy text-white">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28 text-center">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
-            Your Renovation. Your Advocate.<br />
-            <span className="text-gold">Zero Conflicts.</span>
-          </h1>
-          <p className="text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto mb-10">
-            Get a free AI-powered Readiness Report with cost estimates, risk assessment, and regulatory checklists — in minutes.
+      <div className="parapet-gradient flex flex-col items-center justify-center px-6 pt-16 pb-10 text-white">
+        <ParapetLogo size={56} className="text-white mb-5" />
+        <h1 className="text-2xl font-bold tracking-tight text-center mb-2">
+          PARAPET
+        </h1>
+        <p className="text-[15px] text-white/90 text-center max-w-[300px] leading-relaxed font-medium mb-1">
+          The only one on the job site who works for you.
+        </p>
+        <p className="text-xs text-white/55 text-center max-w-[260px] leading-relaxed">
+          AI-powered renovation governance that protects your budget, timeline, and peace of mind.
+        </p>
+      </div>
+
+      {/* Social proof strip */}
+      <div className="bg-[#1E3A5F]/[0.04] border-b border-border/30 py-4 px-6">
+        <div className="grid grid-cols-3 gap-2">
+          {platformNumbers.map((stat) => (
+            <div key={stat.label} className="text-center">
+              <p className="text-base font-bold text-[#1E3A5F]">{stat.value}</p>
+              <p className="text-[9px] text-muted-foreground leading-tight mt-0.5">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Fiduciary value props */}
+      <div className="px-6 pt-7 pb-2">
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+          Our Promise
+        </h2>
+
+        <div className="space-y-5">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-[#1E3A5F]/10 flex items-center justify-center flex-shrink-0">
+              <Shield size={18} className="text-[#1E3A5F]" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Conflict-Free Governance</h3>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                We earn no fees, commissions, or referral payments from contractors, vendors, or anyone involved in your project. Our only client is you. Our only revenue source is you. Our loyalty is undivided.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+              <Eye size={18} className="text-emerald-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Full Transparency</h3>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                Every recommendation shows the evidence behind it — the data sources, confidence levels, and reasoning. When we flag a risk, you see exactly what triggered it and why it matters. No black boxes.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+              <Scale size={18} className="text-amber-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">We Recommend. You Decide.</h3>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                We conduct thorough due diligence on every contractor, bid, contract, and change order — so you don&apos;t have to. But every decision remains yours. We never act without your approval.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* What PARAPET does — capability grid */}
+      <div className="px-6 pt-6 pb-2">
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+          What You Get
+        </h2>
+        <div className="space-y-3.5">
+          {coreCapabilities.map((cap) => (
+            <div key={cap.title} className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-[#1E3A5F]/[0.08] flex items-center justify-center flex-shrink-0 mt-0.5">
+                <cap.icon size={14} className="text-[#1E3A5F]" />
+              </div>
+              <div>
+                <p className="text-[13px] font-semibold text-foreground leading-tight">{cap.title}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{cap.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* The problem statement */}
+      <div className="px-6 pt-7 pb-6">
+        <div className="bg-amber-50 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-2.5">
+            <AlertTriangle size={16} className="text-amber-600" />
+            <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">The Reality</p>
+          </div>
+          <p className="text-[13px] text-amber-900 leading-relaxed font-medium mb-2">
+            80% of home renovations go over budget. 70% run past deadline. Most homeowners have no independent advocate reviewing their contractor&apos;s work.
           </p>
-          <Link href="/readiness">
-            <Button variant="gold" size="lg" className="text-lg px-10 py-6 h-auto">
-              Get Your Free Readiness Report <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          </Link>
+          <p className="text-xs text-amber-700/80 leading-relaxed">
+            PARAPET changes that. We sit between you and the complexity — analyzing bids, reviewing contracts, monitoring schedules, verifying payments, and flagging problems before they compound. Like having a seasoned owner&apos;s representative in your pocket, powered by AI.
+          </p>
         </div>
-      </section>
+      </div>
 
-      {/* Trust Bar */}
-      <section className="bg-slate-50 border-y border-slate-200">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
-            <div className="flex flex-col items-center gap-2">
-              <TrendingUp className="h-6 w-6 text-gold" />
-              <p className="text-sm font-medium text-slate-700">75% of renovations go over budget</p>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <DollarSign className="h-6 w-6 text-gold" />
-              <p className="text-sm font-medium text-slate-700">$425B annual renovation market</p>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <ShieldCheck className="h-6 w-6 text-gold" />
-              <p className="text-sm font-medium text-slate-700">$0 — we never charge contractors</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-navy text-center mb-12 tracking-tight">How It Works</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                step: '1',
-                title: 'Tell Us About Your Project',
-                desc: '5-minute questionnaire about your home, scope, budget, and timeline.',
-                icon: ClipboardCheck,
-              },
-              {
-                step: '2',
-                title: 'Get Your Readiness Report',
-                desc: 'AI-powered analysis with cost ranges, risk scores, and regulatory requirements.',
-                icon: BarChart3,
-              },
-              {
-                step: '3',
-                title: 'Upgrade to Bidding Pro',
-                desc: 'Get matched with 3 pre-vetted contractors, standardized bid packets, and scope documents.',
-                icon: Target,
-              },
-            ].map((item) => (
-              <div key={item.step} className="text-center">
-                <div className="mx-auto h-16 w-16 rounded-full bg-gold/10 flex items-center justify-center mb-4">
-                  <item.icon className="h-8 w-8 text-gold" />
-                </div>
-                <div className="inline-block bg-navy text-white text-xs font-bold px-2 py-1 rounded-full mb-3">
-                  Step {item.step}
-                </div>
-                <h3 className="text-lg font-semibold text-navy mb-2">{item.title}</h3>
-                <p className="text-sm text-slate-500">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* What's In Your Free Report */}
-      <section className="py-20 bg-slate-50">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-navy text-center mb-12 tracking-tight">What&apos;s In Your Free Report</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[
-              { icon: Lightbulb, label: 'AI-powered readiness assessment' },
-              { icon: DollarSign, label: 'Cost range estimates (P10–P90)' },
-              { icon: ClipboardCheck, label: 'Regulatory checklist' },
-              { icon: BarChart3, label: 'Risk scoring (0–10 composite)' },
-              { icon: ShieldCheck, label: 'Contractor screening guidance' },
-              { icon: TrendingUp, label: 'Market context analysis' },
-              { icon: Download, label: 'Downloadable PDF report' },
-              { icon: ListChecks, label: 'Next steps action plan' },
-            ].map((item, i) => (
-              <div key={i} className="flex flex-col items-center text-center p-4 bg-white rounded-xl border border-slate-200">
-                <item.icon className="h-8 w-8 text-gold mb-3" />
-                <p className="text-sm font-medium text-slate-700">{item.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Why PARAPET */}
-      <section className="py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-navy text-center mb-12 tracking-tight">Why PARAPET</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                title: 'Structurally Neutral',
-                desc: 'We are paid by you. We never accept contractor commissions, referral fees, or vendor payments. Ever.',
-                icon: ShieldCheck,
-              },
-              {
-                title: 'AI-Powered Precision',
-                desc: 'Our estimates use real NYC project data from hundreds of renovations — not generic national averages.',
-                icon: Target,
-              },
-              {
-                title: 'Your Data, Your Control',
-                desc: 'Your budget is never shared with contractors. Every recommendation includes transparent confidence levels.',
-                icon: FileText,
-              },
-            ].map((item) => (
-              <div key={item.title} className="bg-white border border-slate-200 rounded-xl p-6 hover:shadow-md transition-shadow">
-                <item.icon className="h-10 w-10 text-gold mb-4" />
-                <h3 className="text-lg font-semibold text-navy mb-2">{item.title}</h3>
-                <p className="text-sm text-slate-500">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Bottom CTA */}
-      <section className="bg-navy text-white py-16">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold mb-4 tracking-tight">Ready to start?</h2>
-          <p className="text-slate-300 mb-8">Get your free Readiness Report now.</p>
-          <Link href="/readiness">
-            <Button variant="gold" size="lg" className="text-lg px-10 py-6 h-auto">
-              Get Your Free Readiness Report <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          </Link>
-        </div>
-      </section>
-
-      <Footer />
+      {/* CTA */}
+      <div className="px-6 pb-6 space-y-3">
+        <Link href="/intake/home-type">
+          <Button
+            className="w-full h-12 bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white font-semibold text-sm rounded-xl shadow-lg shadow-[#1E3A5F]/20"
+          >
+            <span>Get Your Free Readiness Report</span>
+            <ArrowRight size={16} className="ml-2" />
+          </Button>
+        </Link>
+        <p className="text-[10px] text-center text-muted-foreground">
+          No credit card required. Your complimentary AI assessment takes 5 minutes.
+        </p>
+        <p className="text-[10px] text-center text-muted-foreground/70 font-medium italic">
+          Renovation without the fiction.
+        </p>
+      </div>
     </div>
   );
 }
