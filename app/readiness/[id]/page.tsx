@@ -93,6 +93,9 @@ export default function ReadinessReportPage() {
         const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}`);
         if (!res.ok) throw new Error(`Failed to load report: ${res.status}`);
         const data = await res.json();
+        if (data.detail || !data.report_json) {
+          throw new Error(data.detail || "Report data is incomplete");
+        }
         setReport(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load report");
@@ -294,7 +297,7 @@ export default function ReadinessReportPage() {
           <Card className="p-3 text-center rounded-xl border border-border/50">
             <TrendingUp size={16} className="mx-auto text-[#2BCBBA] mb-1" />
             <p className="text-lg font-bold text-foreground">
-              {p10Cost != null && p90Cost != null ? `${formatCurrencyK(p10Cost)}{'\u2013'}${formatCurrencyK(p90Cost)}` : "\u2014"}
+              {p10Cost != null && p90Cost != null ? `${formatCurrencyK(p10Cost)}\u2013${formatCurrencyK(p90Cost)}` : "\u2014"}
             </p>
             <p className="text-[10px] text-muted-foreground">est. range (80% CI)</p>
           </Card>
