@@ -29,7 +29,6 @@ function EstimateGeneratingContent() {
   const spatialId = searchParams.get("spatial_id");
   const walkthroughId = searchParams.get("walkthrough_id");
 
-  // Filter steps based on what was uploaded
   const activeSteps = STEPS.filter(s =>
     s.condition === "always" ||
     (s.condition === "walkthrough" && walkthroughId) ||
@@ -42,30 +41,98 @@ function EstimateGeneratingContent() {
   const [elapsed, setElapsed] = useState(0);
   const [animationDone, setAnimationDone] = useState(false);
   const [errorState, setErrorState] = useState<"timeout" | "failed" | null>(null);
+  const [errorDetail, setErrorDetail] = useState("");
   const startTime = useRef(Date.now());
   const frameRef = useRef<number>();
   const redirected = useRef(false);
   const triggered = useRef(false);
 
-  // Trigger backend processing on mount
+  // ── Trigger backend processing on mount ──
+  // Spatial estimate is SYNCHRONOUS — await its response directly
+  // Walkthrough analyze is ASYNC — returns 202, then poll for completion
   useEffect(() => {
     if (triggered.current) return;
     triggered.current = true;
 
     async function triggerProcessing() {
       try {
+        // Fire spatial estimate (synchronous) and walkthrough analyze (async) in parallel
+        const promises: Promise<{ type: string; ok: boolean; data?: Record<string, unknown>; error?: string }>[] = [];
+
         if (spatialId) {
-          await fetch(`${API_URL}/v1/spatial/${spatialId}/estimate`, { method: "POST" });
+          promises.push(
+            fetch(`${API_URL}/v1/spatial/${spatialId}/estimate`, { method: "POST" })
+              .then(async (res) => {
+                if (!res.ok) {
+                  const text = await res.text().catch(() => "");
+                  return { type: "spatial", ok: false, error: `Spatial estimate failed (${res.status}): ${text}` };
+                }
+                const data = await res.json();
+                return { type: "spatial", ok: true, data };
+              })
+              .catch((err) => ({ type: "spatial", ok: false, error: String(err) }))
+          );
         }
+
         if (walkthroughId) {
-          await fetch(`${API_URL}/v1/walkthrough/${walkthroughId}/analyze`, { method: "POST" });
+          promises.push(
+            fetch(`${API_URL}/v1/walkthrough/${walkthroughId}/analyze`, { method: "POST" })
+              .then(async (res) => {
+                if (!res.ok && res.status !== 409) {
+                  // 409 = already analyzing/analyzed, that's fine
+                  const text = await res.text().catch(() => "");
+                  return { type: "walkthrough", ok: false, error: `Walkthrough analyze failed (${res.status}): ${text}` };
+                }
+                return { type: "walkthrough", ok: true };
+              })
+              .catch((err) => ({ type: "walkthrough", ok: false, error: String(err) }))
+          );
         }
-      } catch {
-        // Processing may already be running; continue polling
+
+        const results = await Promise.all(promises);
+
+        // Check for spatial success (synchronous — we have the result already)
+        const spatialResult = results.find(r => r.type === "spatial");
+        const walkthroughResult = results.find(r => r.type === "walkthrough");
+
+        if (spatialResult && !spatialResult.ok) {
+          // Spatial failed but walkthrough might still work
+          if (!walkthroughId) {
+            setErrorState("failed");
+            setErrorDetail(spatialResult.error || "Estimate generation failed");
+            return;
+          }
+        }
+
+        if (walkthroughResult && !walkthroughResult.ok && !spatialId) {
+          setErrorState("failed");
+          setErrorDetail(walkthroughResult.error || "Analysis failed");
+          return;
+        }
+
+        // If only spatial (no walkthrough), we're done — spatial is synchronous
+        if (spatialId && !walkthroughId && spatialResult?.ok) {
+          // Wait for animation to catch up, then redirect
+          const minWait = Math.max(0, totalDuration - (Date.now() - startTime.current));
+          setTimeout(() => {
+            if (!redirected.current) {
+              redirected.current = true;
+              router.push("/dashboard");
+            }
+          }, Math.min(minWait, 3000)); // Wait at most 3s more for animation
+          return;
+        }
+
+        // If walkthrough is involved, we need to poll for it
+        // (polling is handled by the separate useEffect below)
+      } catch (err) {
+        setErrorState("failed");
+        setErrorDetail(err instanceof Error ? err.message : "Processing failed");
       }
     }
+
     triggerProcessing();
-  }, [spatialId, walkthroughId]);
+  }, [spatialId, walkthroughId, router, totalDuration]);
 
   // Animation
   useEffect(() => {
@@ -86,9 +153,9 @@ function EstimateGeneratingContent() {
     return () => { if (frameRef.current) cancelAnimationFrame(frameRef.current); };
   }, [activeSteps, totalDuration]);
 
-  // Poll for completion
-  const pollStatus = useCallback(async () => {
-    if (redirected.current || errorState) return;
+  // Poll walkthrough status (only when walkthrough is involved)
+  const pollWalkthrough = useCallback(async () => {
+    if (!walkthroughId || redirected.current || errorState) return;
 
     if (Date.now() - startTime.current > HARD_TIMEOUT_MS) {
       setErrorState("timeout");
@@ -96,43 +163,29 @@ function EstimateGeneratingContent() {
     }
 
     try {
-      // Check walkthrough status if it exists
-      if (walkthroughId) {
-        const res = await fetch(`${API_URL}/v1/walkthrough/${walkthroughId}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.status === "completed" || data.analysis) {
-            redirected.current = true;
-            router.push("/dashboard");
-            return;
-          }
-          if (data.status === "failed") {
-            setErrorState("failed");
-            return;
-          }
-        }
+      const res = await fetch(`${API_URL}/v1/walkthrough/${walkthroughId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      if (data.status === "analyzed" || data.analysis) {
+        redirected.current = true;
+        router.push("/dashboard");
+        return;
       }
-      // Check spatial estimate if it exists
-      if (spatialId && !walkthroughId) {
-        const res = await fetch(`${API_URL}/v1/spatial/${spatialId}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.estimate || data.status === "completed") {
-            redirected.current = true;
-            router.push("/dashboard");
-            return;
-          }
-        }
+      if (data.status === "analysis_failed") {
+        setErrorState("failed");
+        setErrorDetail(data.error_message || "Walkthrough analysis failed");
       }
     } catch {
       // Keep polling
     }
-  }, [walkthroughId, spatialId, router, errorState]);
+  }, [walkthroughId, router, errorState]);
 
   useEffect(() => {
-    const interval = setInterval(pollStatus, 3000);
+    if (!walkthroughId) return; // No polling needed for spatial-only
+    const interval = setInterval(pollWalkthrough, 3000);
     return () => clearInterval(interval);
-  }, [pollStatus]);
+  }, [walkthroughId, pollWalkthrough]);
 
   const overallProgress = Math.min((elapsed / totalDuration) * 100, 100);
   const remainingSeconds = Math.max(0, Math.ceil((totalDuration - elapsed) / 1000));
@@ -142,7 +195,8 @@ function EstimateGeneratingContent() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-background px-8">
         <ParapetLogo size={48} className="text-[#1E3A5F] mb-6" />
         <h1 className="text-lg font-bold text-foreground mb-2">Something went wrong</h1>
-        <p className="text-sm text-muted-foreground text-center mb-6">We couldn&apos;t process your data. Please try again.</p>
+        <p className="text-sm text-muted-foreground text-center mb-2">We couldn&apos;t process your data. Please try again.</p>
+        {errorDetail && <p className="text-[10px] text-muted-foreground/70 text-center mb-6 max-w-[300px]">{errorDetail}</p>}
         <button onClick={() => router.push("/capture")} className="px-6 py-3 bg-[#1E3A5F] text-white rounded-xl font-medium text-sm hover:bg-[#2A4F7A] transition-colors">
           Try Again
         </button>
