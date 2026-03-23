@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,9 @@ const formatCurrencyK = (n: number | null | undefined): string => {
 
 const daysToWeeks = (days: number | null | undefined): number | null =>
   days != null ? Math.round(days / 7) : null;
+
+const POLL_INTERVAL_MS = 3000;
+const POLL_TIMEOUT_MS = 120_000; // 120 seconds
 
 // ── Confidence Gauge (0-10 mapped to 0-100%) ──
 
@@ -84,27 +87,101 @@ export default function ReadinessReportPage() {
 
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollStartRef = useRef<number>(0);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    async function fetchReport() {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
-        const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}`);
-        if (!res.ok) throw new Error(`Failed to load report: ${res.status}`);
-        const data = await res.json();
-        if (data.detail || !data.report_json) {
-          throw new Error(data.detail || "Report data is incomplete");
-        }
-        setReport(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load report");
-      } finally {
+  const fetchReport = useCallback(async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
+      const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}`);
+
+      if (res.status === 404) {
+        setError("Report not found");
         setLoading(false);
+        setGenerating(false);
+        return;
       }
+      if (!res.ok) {
+        throw new Error(`Failed to load report: ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      if (data.detail) {
+        setError(data.detail);
+        setLoading(false);
+        setGenerating(false);
+        return;
+      }
+
+      if (data.status === "failed") {
+        setError("Report generation failed. Please try again.");
+        setLoading(false);
+        setGenerating(false);
+        return;
+      }
+
+      // Report is ready — has report_json
+      if (data.report_json) {
+        setReport(data);
+        setLoading(false);
+        setGenerating(false);
+        // Stop polling
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        return;
+      }
+
+      // Still processing — start polling if not already
+      setLoading(false);
+      setGenerating(true);
+
+      if (!pollStartRef.current) {
+        pollStartRef.current = Date.now();
+      }
+
+      // Check poll timeout
+      if (Date.now() - pollStartRef.current > POLL_TIMEOUT_MS) {
+        setGenerating(false);
+        setError("Report generation is taking longer than expected. Please refresh the page or try again later.");
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        return;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load report");
+      setLoading(false);
+      setGenerating(false);
     }
-    fetchReport();
   }, [reportId]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
+
+  // Start polling when in generating state
+  useEffect(() => {
+    if (generating && !pollIntervalRef.current) {
+      pollIntervalRef.current = setInterval(fetchReport, POLL_INTERVAL_MS);
+    }
+    if (!generating && pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [generating, fetchReport]);
 
   if (loading) {
     return (
@@ -113,6 +190,24 @@ export default function ReadinessReportPage() {
           <ParapetLogo size={48} className="text-[#1E3A5F] animate-pulse" />
           <p className="text-sm text-muted-foreground">Loading report...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (generating) {
+    return (
+      <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col items-center justify-center bg-background px-6 shadow-xl">
+        <div className="relative w-16 h-16 mb-6">
+          <svg className="w-16 h-16 animate-[spin_2.5s_linear_infinite]" viewBox="0 0 80 80" fill="none">
+            <circle cx="40" cy="40" r="36" stroke="hsl(var(--muted))" strokeWidth="3" />
+            <path d="M40 4 A36 36 0 0 1 76 40" stroke="#1E3A5F" strokeWidth="3" strokeLinecap="round" />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <ParapetLogo size={22} className="text-[#1E3A5F]" />
+          </div>
+        </div>
+        <h1 className="text-lg font-bold text-foreground mb-2">Still generating your report...</h1>
+        <p className="text-sm text-muted-foreground text-center">This usually takes 20{'\u2013'}30 seconds. Hang tight.</p>
       </div>
     );
   }

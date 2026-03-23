@@ -13,6 +13,7 @@ const ANALYSIS_STEPS = [
 ];
 
 const TOTAL_DURATION = ANALYSIS_STEPS.reduce((sum, s) => sum + s.duration, 0);
+const HARD_TIMEOUT_MS = 90_000; // 90 seconds
 
 function GeneratingContent() {
   const router = useRouter();
@@ -21,7 +22,8 @@ function GeneratingContent() {
 
   const [activeStep, setActiveStep] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const [pollError, setPollError] = useState(false);
+  const [errorState, setErrorState] = useState<"failed" | "timeout" | null>(null);
+  const [animationDone, setAnimationDone] = useState(false);
   const startTime = useRef(Date.now());
   const frameRef = useRef<number>();
   const pollCount = useRef(0);
@@ -40,15 +42,27 @@ function GeneratingContent() {
         if (i === ANALYSIS_STEPS.length - 1) setActiveStep(ANALYSIS_STEPS.length);
       }
 
+      if (dt >= TOTAL_DURATION) {
+        setAnimationDone(true);
+      }
+
       if (dt < TOTAL_DURATION) frameRef.current = requestAnimationFrame(tick);
     };
     frameRef.current = requestAnimationFrame(tick);
     return () => { if (frameRef.current) cancelAnimationFrame(frameRef.current); };
   }, []);
 
-  // Poll backend for report status
+  // Poll backend for report status — only redirect when actually completed
   const pollReport = useCallback(async () => {
-    if (!reportId || redirected.current) return;
+    if (!reportId || redirected.current || errorState) return;
+
+    // Hard timeout check
+    const totalElapsed = Date.now() - startTime.current;
+    if (totalElapsed > HARD_TIMEOUT_MS) {
+      setErrorState("timeout");
+      return;
+    }
+
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
       const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}`);
@@ -61,14 +75,17 @@ function GeneratingContent() {
         return;
       }
       if (data.status === "failed") {
-        setPollError(true);
+        setErrorState("failed");
         return;
       }
+      // Still processing — keep polling
     } catch {
       pollCount.current++;
-      if (pollCount.current >= 10) setPollError(true);
+      if (pollCount.current >= 15) {
+        setErrorState("timeout");
+      }
     }
-  }, [reportId, router]);
+  }, [reportId, router, errorState]);
 
   useEffect(() => {
     if (!reportId) return;
@@ -76,23 +93,11 @@ function GeneratingContent() {
     return () => clearInterval(interval);
   }, [reportId, pollReport]);
 
-  // Fallback: if animation completes and we haven't redirected, try one final poll then redirect anyway
-  useEffect(() => {
-    if (elapsed >= TOTAL_DURATION && !redirected.current && reportId) {
-      const timeout = setTimeout(() => {
-        if (!redirected.current) {
-          redirected.current = true;
-          router.push(`/readiness/${reportId}`);
-        }
-      }, 2000);
-      return () => clearTimeout(timeout);
-    }
-  }, [elapsed, reportId, router]);
-
   const overallProgress = Math.min((elapsed / TOTAL_DURATION) * 100, 100);
   const remainingSeconds = Math.max(0, Math.ceil((TOTAL_DURATION - elapsed) / 1000));
 
-  if (pollError) {
+  // Error: pipeline failed
+  if (errorState === "failed") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background px-8">
         <ParapetLogo size={48} className="text-[#1E3A5F] mb-6" />
@@ -101,10 +106,29 @@ function GeneratingContent() {
           We couldn&apos;t generate your report. Please try again.
         </p>
         <button
-          onClick={() => { setPollError(false); pollCount.current = 0; startTime.current = Date.now(); setElapsed(0); setActiveStep(0); redirected.current = false; }}
+          onClick={() => router.push("/intake/review")}
           className="px-6 py-3 bg-[#1E3A5F] text-white rounded-xl font-medium text-sm hover:bg-[#2A4F7A] transition-colors"
         >
-          Retry
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  // Error: hard timeout
+  if (errorState === "timeout") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background px-8">
+        <ParapetLogo size={48} className="text-[#1E3A5F] mb-6" />
+        <h1 className="text-lg font-bold text-foreground mb-2">Taking longer than expected</h1>
+        <p className="text-sm text-muted-foreground text-center mb-6">
+          Your report is taking longer than expected. Please check back in a few minutes.
+        </p>
+        <button
+          onClick={() => router.push("/")}
+          className="px-6 py-3 bg-[#1E3A5F] text-white rounded-xl font-medium text-sm hover:bg-[#2A4F7A] transition-colors"
+        >
+          Back to Home
         </button>
       </div>
     );
@@ -126,7 +150,7 @@ function GeneratingContent() {
         </div>
 
         <h1 className="text-lg font-bold text-foreground text-center mb-6">
-          Generating Your Report
+          {animationDone ? "Finalizing your report..." : "Generating Your Report"}
         </h1>
 
         <div className="w-full max-w-[280px] space-y-2.5 mb-8">
@@ -167,16 +191,25 @@ function GeneratingContent() {
           })}
         </div>
 
-        <p className="text-[11px] text-muted-foreground mb-6">
-          Estimated time remaining: ~{remainingSeconds}s
-        </p>
+        {!animationDone ? (
+          <p className="text-[11px] text-muted-foreground mb-6">
+            Estimated time remaining: ~{remainingSeconds}s
+          </p>
+        ) : (
+          <div className="flex items-center gap-2 mb-6">
+            <div className="w-3 h-3 rounded-full border-2 border-[#1E3A5F] border-t-transparent animate-spin" />
+            <p className="text-[11px] text-muted-foreground">Almost there...</p>
+          </div>
+        )}
 
         <div className="w-full max-w-[300px]">
           <div
             className="h-2.5 rounded-full overflow-hidden transition-all duration-700"
             style={{
               width: `${Math.min(100, overallProgress * 1.15)}%`,
-              background: `linear-gradient(90deg, #1E3A5F ${Math.max(0, overallProgress - 10)}%, #2BCBBA ${overallProgress}%, hsl(var(--muted)) ${Math.min(100, overallProgress + 5)}%)`,
+              background: animationDone
+                ? "linear-gradient(90deg, #1E3A5F, #2BCBBA)"
+                : `linear-gradient(90deg, #1E3A5F ${Math.max(0, overallProgress - 10)}%, #2BCBBA ${overallProgress}%, hsl(var(--muted)) ${Math.min(100, overallProgress + 5)}%)`,
             }}
           />
         </div>
