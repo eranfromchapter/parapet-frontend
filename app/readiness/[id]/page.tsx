@@ -218,7 +218,7 @@ export default function ReadinessReportPage() {
         <ParapetLogo size={48} className="text-[#1E3A5F] mb-6" />
         <h1 className="text-lg font-bold text-foreground mb-2">Report not available</h1>
         <p className="text-sm text-muted-foreground text-center mb-6">{error || "Report data is missing."}</p>
-        <button onClick={() => router.push("/")} className="text-sm font-medium text-[#1E3A5F] hover:underline">Back to home</button>
+        <button onClick={() => router.push("/dashboard")} className="text-sm font-medium text-[#1E3A5F] hover:underline">Back to home</button>
       </div>
     );
   }
@@ -294,7 +294,7 @@ export default function ReadinessReportPage() {
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/40">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <button onClick={() => router.push("/")} className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors">
+            <button onClick={() => router.push("/dashboard")} className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors">
               <ChevronLeft size={22} className="text-foreground" />
             </button>
             <div>
