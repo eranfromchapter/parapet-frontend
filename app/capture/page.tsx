@@ -211,20 +211,21 @@ export default function SpaceCapturePage() {
         const fd = new FormData();
         fd.append("file", file);
         const res = await fetch(`${API_URL}/v1/spatial/upload`, { method: "POST", body: fd });
-        if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+        if (!res.ok) {
+          const errBody = await res.text().catch(() => "");
+          throw new Error(errBody || `Upload failed: ${res.status}`);
+        }
         const data = await res.json();
         const sid = data.id || data.spatial_id;
-        setSpatialId(sid);
-        setToast("LiDAR scan uploaded successfully!");
+        const parsedRooms = data.rooms ?? [];
 
-        // Fetch parsed rooms
-        if (sid) {
-          setUploadProgress("Parsing rooms...");
-          const roomsRes = await fetch(`${API_URL}/v1/spatial/${sid}`);
-          if (roomsRes.ok) {
-            const roomsData = await roomsRes.json();
-            setRooms(roomsData.rooms ?? roomsData.parsed_rooms ?? []);
-          }
+        if (parsedRooms.length === 0) {
+          setToast("No rooms detected in this PDF. Please upload a Polycam Floorplan Report.");
+          // Don't set spatialId — prevent generating a $0 estimate
+        } else {
+          setSpatialId(sid);
+          setRooms(parsedRooms);
+          setToast(`LiDAR scan uploaded \u2014 ${parsedRooms.length} room${parsedRooms.length > 1 ? "s" : ""} detected!`);
         }
       } else if (["mp4", "mov", "webm"].includes(ext)) {
         setUploadProgress("Uploading video...");
