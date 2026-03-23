@@ -31,22 +31,23 @@ export default function EstimateViewPage() {
   useEffect(() => {
     async function fetchEstimate() {
       try {
-        // First try to generate/get the estimate from spatial
+        // Try generating the estimate (idempotent — returns same result if already generated)
         const res = await fetch(`${API_URL}/v1/spatial/${spatialId}/estimate`, { method: "POST" });
-        if (!res.ok) {
-          // If POST fails (already generated), try GET spatial for cached data
-          const getRes = await fetch(`${API_URL}/v1/spatial/${spatialId}`);
-          if (!getRes.ok) throw new Error(`Failed to load estimate: ${getRes.status}`);
-          const data = await getRes.json();
-          if (data.estimate) {
-            setEstimate(data.estimate);
-          } else {
-            throw new Error("No estimate data available");
-          }
-        } else {
-          const data = await res.json();
-          setEstimate(data);
+        if (res.ok) {
+          setEstimate(await res.json());
+          return;
         }
+
+        // Fallback: check if the spatial model has cached estimate data
+        const getRes = await fetch(`${API_URL}/v1/spatial/${spatialId}`);
+        if (!getRes.ok) throw new Error(`Spatial model not found (${getRes.status})`);
+        const data = await getRes.json();
+        if (data.estimate) {
+          setEstimate(data.estimate);
+          return;
+        }
+
+        throw new Error("No estimate data available. Please upload a Polycam PDF first.");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load estimate");
       } finally {

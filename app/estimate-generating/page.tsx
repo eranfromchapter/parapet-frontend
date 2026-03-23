@@ -110,9 +110,11 @@ function EstimateGeneratingContent() {
           return;
         }
 
-        // If only spatial (no walkthrough), we're done — spatial is synchronous
-        if (spatialId && !walkthroughId && spatialResult?.ok) {
-          // Wait for animation to catch up, then redirect to estimate view
+        // If spatial succeeded (with or without walkthrough), we have an estimate
+        // For spatial-only: redirect immediately after animation
+        // For spatial+walkthrough: redirect to estimate after spatial completes
+        //   (walkthrough enriches the estimate later but we can show spatial results now)
+        if (spatialId && spatialResult?.ok) {
           const minWait = Math.max(0, totalDuration - (Date.now() - startTime.current));
           setTimeout(() => {
             if (!redirected.current) {
@@ -123,7 +125,7 @@ function EstimateGeneratingContent() {
           return;
         }
 
-        // If walkthrough is involved, we need to poll for it
+        // Walkthrough-only (no spatial): poll for walkthrough completion
         // (polling is handled by the separate useEffect below)
       } catch (err) {
         setErrorState("failed");
@@ -169,7 +171,8 @@ function EstimateGeneratingContent() {
 
       if (data.status === "analyzed" || data.analysis) {
         redirected.current = true;
-        router.push("/dashboard");
+        // If we also have spatial data, show the estimate; otherwise dashboard
+        router.push(spatialId ? `/estimate/${spatialId}` : "/dashboard");
         return;
       }
       if (data.status === "analysis_failed") {
@@ -179,7 +182,7 @@ function EstimateGeneratingContent() {
     } catch {
       // Keep polling
     }
-  }, [walkthroughId, router, errorState]);
+  }, [walkthroughId, spatialId, router, errorState]);
 
   useEffect(() => {
     if (!walkthroughId) return; // No polling needed for spatial-only
