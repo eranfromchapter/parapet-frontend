@@ -94,24 +94,41 @@ function WalkthroughModal({ onClose, onStart }: { onClose: () => void; onStart: 
 
 // ── Recording UI ──
 
-function RecordingOverlay({ seconds, onStop }: { seconds: number; onStop: () => void }) {
+function RecordingOverlay({ seconds, onStop, stream }: { seconds: number; onStop: () => void; stream: MediaStream | null }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(seconds % 60).padStart(2, "0");
 
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
   return (
-    <div className="fixed inset-0 z-[60] bg-black flex flex-col items-center justify-center">
-      <div className="flex items-center gap-2 mb-8">
-        <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-        <span className="text-white text-2xl font-mono font-bold">{mm}:{ss}</span>
+    <div className="fixed inset-0 z-[60] bg-black">
+      {/* Live camera preview */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      {/* Overlay controls */}
+      <div className="absolute inset-0 flex flex-col items-center justify-end pb-20">
+        <div className="flex items-center gap-2 mb-6 bg-black/50 px-4 py-2 rounded-full">
+          <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+          <span className="text-white text-2xl font-mono font-bold">{mm}:{ss}</span>
+        </div>
+        <button
+          onClick={onStop}
+          className="w-16 h-16 rounded-full bg-red-500 border-4 border-white flex items-center justify-center"
+        >
+          <div className="w-6 h-6 rounded-sm bg-white" />
+        </button>
+        <p className="text-white/60 text-xs mt-4">Tap to stop recording</p>
       </div>
-      <p className="text-white/60 text-sm mb-8">Recording video walkthrough...</p>
-      <button
-        onClick={onStop}
-        className="w-16 h-16 rounded-full bg-red-500 border-4 border-white flex items-center justify-center"
-      >
-        <div className="w-6 h-6 rounded-sm bg-white" />
-      </button>
-      <p className="text-white/40 text-xs mt-4">Tap to stop recording</p>
     </div>
   );
 }
@@ -217,14 +234,34 @@ export default function SpaceCapturePage() {
   const startRecording = useCallback(async () => {
     setShowModal(false);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: true,
+      });
       streamRef.current = stream;
       chunksRef.current = [];
-      const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+
+      // Pick a supported MIME type (Safari doesn't support webm)
+      const mimeTypes = [
+        "video/mp4",
+        "video/webm;codecs=vp9",
+        "video/webm;codecs=vp8",
+        "video/webm",
+      ];
+      let selectedMime = "";
+      for (const mt of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(mt)) { selectedMime = mt; break; }
+      }
+      const recorderOpts: MediaRecorderOptions = selectedMime ? { mimeType: selectedMime } : {};
+      const ext = selectedMime.startsWith("video/mp4") ? "mp4" : "webm";
+      const blobType = selectedMime || "video/webm";
+
+      const recorder = new MediaRecorder(stream, recorderOpts);
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(chunksRef.current, { type: "video/webm" });
+        streamRef.current = null;
+        const blob = new Blob(chunksRef.current, { type: blobType });
         setIsRecording(false);
         setRecordingTime(0);
 
@@ -233,12 +270,16 @@ export default function SpaceCapturePage() {
         setUploadProgress("Uploading recording...");
         try {
           const fd = new FormData();
-          fd.append("file", blob, "walkthrough.webm");
-          const params = new URLSearchParams();
-          if (spatialId) params.set("spatial_id", spatialId);
-          const url = `${API_URL}/v1/walkthrough/upload${params.toString() ? "?" + params : ""}`;
+          fd.append("file", blob, `walkthrough.${ext}`);
+          const qp = new URLSearchParams();
+          if (spatialId) qp.set("spatial_id", spatialId);
+          const url = `${API_URL}/v1/walkthrough/upload${qp.toString() ? "?" + qp : ""}`;
           const res = await fetch(url, { method: "POST", body: fd });
-          if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+          if (!res.ok) {
+            const errBody = await res.text().catch(() => "");
+            console.error("Walkthrough upload failed:", res.status, errBody);
+            throw new Error(errBody || `Upload failed (${res.status})`);
+          }
           const data = await res.json();
           const wid = data.id || data.walkthrough_id;
           setWalkthroughId(wid);
@@ -255,7 +296,7 @@ export default function SpaceCapturePage() {
         }
       };
       mediaRecorderRef.current = recorder;
-      recorder.start();
+      recorder.start(1000); // Collect data every 1s for smoother chunks
       setIsRecording(true);
     } catch {
       setToast("Camera access not available. Please record a video using your phone\u2019s camera app, then upload it using the file upload area.");
@@ -292,7 +333,7 @@ export default function SpaceCapturePage() {
     <>
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
       {showModal && <WalkthroughModal onClose={() => setShowModal(false)} onStart={startRecording} />}
-      {isRecording && <RecordingOverlay seconds={recordingTime} onStop={stopRecording} />}
+      {isRecording && <RecordingOverlay seconds={recordingTime} onStop={stopRecording} stream={streamRef.current} />}
 
       <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-background relative shadow-xl">
         {/* Header */}
