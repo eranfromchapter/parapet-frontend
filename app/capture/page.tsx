@@ -43,9 +43,9 @@ function WalkthroughModal({ onClose, onStart }: { onClose: () => void; onStart: 
   ];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-end justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] bg-black/60 flex items-end justify-center" onClick={onClose}>
       <div
-        className="max-w-[430px] w-full bg-background rounded-t-2xl max-h-[90dvh] flex flex-col overflow-hidden animate-[fadeIn_0.2s_ease-out]"
+        className="max-w-[430px] w-full bg-background rounded-t-2xl max-h-[90dvh] flex flex-col overflow-hidden animate-[fadeIn_0.2s_ease-out] z-[61]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Scrollable content */}
@@ -82,7 +82,7 @@ function WalkthroughModal({ onClose, onStart }: { onClose: () => void; onStart: 
         </div>
 
         {/* Sticky button at bottom */}
-        <div className="shrink-0 px-5 py-4 border-t border-border/30 bg-white">
+        <div className="shrink-0 px-5 pt-4 border-t border-border/30 bg-white" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 1rem))" }}>
           <Button onClick={onStart} className="w-full h-12 bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white font-semibold text-sm rounded-xl">
             I Understand &mdash; Start Recording
           </Button>
@@ -99,7 +99,7 @@ function RecordingOverlay({ seconds, onStop }: { seconds: number; onStop: () => 
   const ss = String(seconds % 60).padStart(2, "0");
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center">
+    <div className="fixed inset-0 z-[60] bg-black flex flex-col items-center justify-center">
       <div className="flex items-center gap-2 mb-8">
         <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
         <span className="text-white text-2xl font-mono font-bold">{mm}:{ss}</span>
