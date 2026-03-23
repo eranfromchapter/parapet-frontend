@@ -74,7 +74,7 @@ export default function DashboardPage() {
   // Build phase modules with dynamic status
   const hasReport = !!reportId;
   const discovery: PhaseModule[] = [
-    { label: "Space Capture", href: "#", icon: Scan, status: "pending" },
+    { label: "Space Capture", href: "/capture", icon: Scan, status: "active" },
     { label: "Readiness Report", href: hasReport ? `/readiness/${reportId}` : "#", icon: FileText, status: hasReport ? "completed" : "pending" },
     { label: "Scope Editor", href: "#", icon: PenTool, status: "pending" },
     { label: "Design Studio", href: "#", icon: Palette, status: "pending" },
@@ -185,7 +185,7 @@ export default function DashboardPage() {
         {/* ── Quick Actions ── */}
         <div className="grid grid-cols-4 gap-3 mb-5">
           {[
-            { label: "Create an Estimate", href: "/intake/home-type", icon: Camera, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
+            { label: "Create an Estimate", href: "/capture", icon: Camera, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
             { label: "Readiness Report", href: hasReport ? `/readiness/${reportId}` : "/intake/home-type", icon: FileText, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
             { label: "View Estimate", href: "#", icon: BarChart3, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
             { label: "Contractors", href: "#", icon: Users, color: "bg-amber-100", iconColor: "text-amber-600" },
