@@ -149,6 +149,7 @@ export default function SpaceCapturePage() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
+  const [uploadPercent, setUploadPercent] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -164,6 +165,36 @@ export default function SpaceCapturePage() {
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isRecording]);
+
+  // ── XHR upload with progress ──
+
+  const uploadWithProgress = useCallback((url: string, formData: FormData): Promise<{ ok: boolean; data?: Record<string, unknown>; error?: string }> => {
+    return new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          setUploadPercent(Math.round((e.loaded / e.total) * 100));
+        }
+      });
+      xhr.addEventListener("load", async () => {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve({ ok: true, data });
+          } else {
+            resolve({ ok: false, error: data.detail || `Upload failed (${xhr.status})` });
+          }
+        } catch {
+          resolve({ ok: false, error: `Upload failed (${xhr.status})` });
+        }
+      });
+      xhr.addEventListener("error", () => resolve({ ok: false, error: "Network error during upload" }));
+      xhr.addEventListener("timeout", () => resolve({ ok: false, error: "Upload timed out" }));
+      xhr.timeout = 600_000; // 10 min timeout for large files
+      xhr.open("POST", url);
+      xhr.send(formData);
+    });
+  }, []);
 
   // ── File upload handler ──
 
@@ -197,16 +228,16 @@ export default function SpaceCapturePage() {
         }
       } else if (["mp4", "mov", "webm"].includes(ext)) {
         setUploadProgress("Uploading video...");
+        setUploadPercent(0);
         const fd = new FormData();
         fd.append("file", file);
-        const params = new URLSearchParams();
-        if (spatialId) params.set("spatial_id", spatialId);
-        const url = `${API_URL}/v1/walkthrough/upload${params.toString() ? "?" + params : ""}`;
-        const res = await fetch(url, { method: "POST", body: fd });
-        if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
-        const data = await res.json();
-        const wid = data.id || data.walkthrough_id;
-        setWalkthroughId(wid);
+        const qp = new URLSearchParams();
+        if (spatialId) qp.set("spatial_id", spatialId);
+        const url = `${API_URL}/v1/walkthrough/upload${qp.toString() ? "?" + qp : ""}`;
+        const result = await uploadWithProgress(url, fd);
+        if (!result.ok) throw new Error(result.error || "Upload failed");
+        const wid = (result.data as Record<string, string>)?.id || (result.data as Record<string, string>)?.walkthrough_id;
+        setWalkthroughId(wid || null);
 
         if (wid) {
           setUploadProgress("Starting transcription...");
@@ -268,21 +299,17 @@ export default function SpaceCapturePage() {
         // Upload
         setIsUploading(true);
         setUploadProgress("Uploading recording...");
+        setUploadPercent(0);
         try {
           const fd = new FormData();
           fd.append("file", blob, `walkthrough.${ext}`);
           const qp = new URLSearchParams();
           if (spatialId) qp.set("spatial_id", spatialId);
           const url = `${API_URL}/v1/walkthrough/upload${qp.toString() ? "?" + qp : ""}`;
-          const res = await fetch(url, { method: "POST", body: fd });
-          if (!res.ok) {
-            const errBody = await res.text().catch(() => "");
-            console.error("Walkthrough upload failed:", res.status, errBody);
-            throw new Error(errBody || `Upload failed (${res.status})`);
-          }
-          const data = await res.json();
-          const wid = data.id || data.walkthrough_id;
-          setWalkthroughId(wid);
+          const result = await uploadWithProgress(url, fd);
+          if (!result.ok) throw new Error(result.error || "Upload failed");
+          const wid = (result.data as Record<string, string>)?.id || (result.data as Record<string, string>)?.walkthrough_id;
+          setWalkthroughId(wid || null);
           if (wid) {
             setUploadProgress("Starting transcription...");
             await fetch(`${API_URL}/v1/walkthrough/${wid}/transcribe`, { method: "POST" });
@@ -293,6 +320,7 @@ export default function SpaceCapturePage() {
         } finally {
           setIsUploading(false);
           setUploadProgress("");
+          setUploadPercent(0);
         }
       };
       mediaRecorderRef.current = recorder;
@@ -385,8 +413,22 @@ export default function SpaceCapturePage() {
             />
             {isUploading ? (
               <>
-                <div className="w-10 h-10 mx-auto mb-3 rounded-full border-2 border-[#1E3A5F] border-t-transparent animate-spin" />
-                <p className="text-sm font-semibold text-foreground">{uploadProgress || "Uploading..."}</p>
+                {uploadPercent > 0 && uploadPercent < 100 ? (
+                  <>
+                    <div className="w-full max-w-[200px] mx-auto mb-3">
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${uploadPercent}%`, background: "linear-gradient(90deg, #1E3A5F, #2BCBBA)" }} />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground text-center mt-1">{uploadPercent}%</p>
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">{uploadProgress || "Uploading..."}</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-10 h-10 mx-auto mb-3 rounded-full border-2 border-[#1E3A5F] border-t-transparent animate-spin" />
+                    <p className="text-sm font-semibold text-foreground">{uploadProgress || "Processing..."}</p>
+                  </>
+                )}
               </>
             ) : (
               <>
