@@ -187,7 +187,7 @@ export default function DashboardPage() {
           {[
             { label: "Create an Estimate", href: "/capture", icon: Camera, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
             { label: "Readiness Report", href: hasReport ? `/readiness/${reportId}` : "/intake/home-type", icon: FileText, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
-            { label: "View Estimate", href: "#", icon: BarChart3, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
+            { label: "View Estimate", href: "/capture", icon: BarChart3, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
             { label: "Contractors", href: "#", icon: Users, color: "bg-amber-100", iconColor: "text-amber-600" },
           ].map((action) => (
             <Link key={action.label} href={action.href} className="flex flex-col items-center gap-1.5">

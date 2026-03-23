@@ -43,9 +43,13 @@ function WalkthroughModal({ onClose, onStart }: { onClose: () => void; onStart: 
   ];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-end justify-center">
-      <div className="max-w-[430px] w-full bg-background rounded-t-2xl max-h-[90vh] overflow-y-auto animate-[fadeIn_0.2s_ease-out]">
-        <div className="px-5 pt-6 pb-5">
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-end justify-center" onClick={onClose}>
+      <div
+        className="max-w-[430px] w-full bg-background rounded-t-2xl max-h-[85vh] flex flex-col animate-[fadeIn_0.2s_ease-out]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-5 pt-6 pb-3">
           <div className="flex justify-between items-start mb-4">
             <div className="w-12 h-12 rounded-full bg-[#1E3A5F]/10 flex items-center justify-center">
               <Mic size={24} className="text-[#1E3A5F]" />
@@ -70,12 +74,15 @@ function WalkthroughModal({ onClose, onStart }: { onClose: () => void; onStart: 
             ))}
           </div>
 
-          <div className="p-3 rounded-xl bg-[#2BCBBA]/10 border border-[#2BCBBA]/20 mb-5">
+          <div className="p-3 rounded-xl bg-[#2BCBBA]/10 border border-[#2BCBBA]/20">
             <p className="text-[11px] text-foreground leading-relaxed">
               <span className="font-semibold">Tip:</span> The more detail you provide during the walkthrough, the more accurate your estimate will be. Speak clearly and move the camera slowly.
             </p>
           </div>
+        </div>
 
+        {/* Sticky button at bottom */}
+        <div className="px-5 py-4 border-t border-border/30 bg-background rounded-b-2xl">
           <Button onClick={onStart} className="w-full h-12 bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white font-semibold text-sm rounded-xl">
             I Understand &mdash; Start Recording
           </Button>

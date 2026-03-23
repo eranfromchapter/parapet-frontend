@@ -112,14 +112,14 @@ function EstimateGeneratingContent() {
 
         // If only spatial (no walkthrough), we're done — spatial is synchronous
         if (spatialId && !walkthroughId && spatialResult?.ok) {
-          // Wait for animation to catch up, then redirect
+          // Wait for animation to catch up, then redirect to estimate view
           const minWait = Math.max(0, totalDuration - (Date.now() - startTime.current));
           setTimeout(() => {
             if (!redirected.current) {
               redirected.current = true;
-              router.push("/dashboard");
+              router.push(`/estimate/${spatialId}`);
             }
-          }, Math.min(minWait, 3000)); // Wait at most 3s more for animation
+          }, Math.min(minWait, 3000));
           return;
         }
 
