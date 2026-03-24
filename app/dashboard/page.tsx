@@ -36,27 +36,40 @@ const statusStyles: Record<ModuleStatus, { bg: string; text: string; label: stri
 
 export default function DashboardPage() {
   const [latestReport, setLatestReport] = useState<any>(null);
+  const [latestSpatialId, setLatestSpatialId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchReports() {
+    async function fetchData() {
       try {
+        // Fetch readiness reports
         const res = await fetch(`${API_URL}/v1/readiness-reports`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const reports: any[] = Array.isArray(data) ? data : data.reports ?? data.items ?? [];
-        const completed = reports.find((r: any) => r.status === "completed");
-        if (completed) {
-          // Fetch full report for details
-          const fullRes = await fetch(`${API_URL}/v1/readiness-reports/${completed.id}`);
-          if (fullRes.ok) {
-            setLatestReport(await fullRes.json());
+        if (res.ok) {
+          const data = await res.json();
+          const reports: any[] = Array.isArray(data) ? data : data.reports ?? data.items ?? [];
+          const completed = reports.find((r: any) => r.status === "completed");
+          if (completed) {
+            const fullRes = await fetch(`${API_URL}/v1/readiness-reports/${completed.id}`);
+            if (fullRes.ok) setLatestReport(await fullRes.json());
           }
         }
+
+        // Fetch walkthroughs to find spatial_id
+        try {
+          const wtRes = await fetch(`${API_URL}/v1/walkthrough`);
+          if (wtRes.ok) {
+            const wts = await wtRes.json();
+            const wtList: any[] = Array.isArray(wts) ? wts : [];
+            const withSpatial = wtList.find((w: any) => w.spatial_id);
+            if (withSpatial?.spatial_id) {
+              setLatestSpatialId(withSpatial.spatial_id);
+            }
+          }
+        } catch { /* spatial lookup optional */ }
       } catch { /* silently fail */ }
       finally { setLoading(false); }
     }
-    fetchReports();
+    fetchData();
   }, []);
 
   const reportId = latestReport?.id;
@@ -76,7 +89,7 @@ export default function DashboardPage() {
   const discovery: PhaseModule[] = [
     { label: "Space Capture", href: "/capture", icon: Scan, status: "active" },
     { label: "Readiness Report", href: hasReport ? `/readiness/${reportId}` : "#", icon: FileText, status: hasReport ? "completed" : "pending" },
-    { label: "Scope Editor", href: "/scope/demo", icon: PenTool, status: "active" },
+    { label: "Scope Editor", href: latestSpatialId ? `/scope/${latestSpatialId}` : "/scope/demo", icon: PenTool, status: latestSpatialId ? "active" : "pending" },
     { label: "Design Studio", href: "#", icon: Palette, status: "pending" },
   ];
   const bidding: PhaseModule[] = [
@@ -187,7 +200,7 @@ export default function DashboardPage() {
           {[
             { label: "Create an Estimate", href: "/capture", icon: Camera, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
             { label: "Readiness Report", href: hasReport ? `/readiness/${reportId}` : "/intake/home-type", icon: FileText, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
-            { label: "View Estimate", href: "/scope/demo", icon: BarChart3, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
+            { label: "View Estimate", href: latestSpatialId ? `/scope/${latestSpatialId}` : "/scope/demo", icon: BarChart3, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
             { label: "Contractors", href: "#", icon: Users, color: "bg-amber-100", iconColor: "text-amber-600" },
           ].map((action) => (
             <Link key={action.label} href={action.href} className="flex flex-col items-center gap-1.5">
