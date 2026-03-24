@@ -61,7 +61,7 @@ function EstimateGeneratingContent() {
 
         if (spatialId) {
           promises.push(
-            fetch(`${API_URL}/v1/spatial/${spatialId}/estimate`, { method: "POST" })
+            fetch(`${API_URL}/v1/spatial/${spatialId}/estimate${walkthroughId ? `?walkthrough_id=${walkthroughId}` : ""}`, { method: "POST" })
               .then(async (res) => {
                 if (!res.ok) {
                   const text = await res.text().catch(() => "");
@@ -119,7 +119,7 @@ function EstimateGeneratingContent() {
           setTimeout(() => {
             if (!redirected.current) {
               redirected.current = true;
-              router.push(`/estimate/${spatialId}`);
+              router.push(`/estimate/${spatialId}${walkthroughId ? `?wt=${walkthroughId}` : ""}`);
             }
           }, Math.min(minWait, 3000));
           return;
@@ -172,7 +172,7 @@ function EstimateGeneratingContent() {
       if (data.status === "analyzed" || data.analysis) {
         redirected.current = true;
         // If we also have spatial data, show the estimate; otherwise dashboard
-        router.push(spatialId ? `/estimate/${spatialId}` : "/dashboard");
+        router.push(spatialId ? `/estimate/${spatialId}${walkthroughId ? `?wt=${walkthroughId}` : ""}` : "/dashboard");
         return;
       }
       if (data.status === "analysis_failed") {

@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,10 +18,12 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-produc
 const formatCurrency = (n: number | null | undefined): string =>
   n != null ? `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "\u2014";
 
-export default function EstimateViewPage() {
+function EstimateViewContent() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const spatialId = params.id as string;
+  const walkthroughId = searchParams.get("wt");
 
   const [estimate, setEstimate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -31,8 +33,8 @@ export default function EstimateViewPage() {
   useEffect(() => {
     async function fetchEstimate() {
       try {
-        // Try generating the estimate (idempotent — returns same result if already generated)
-        const res = await fetch(`${API_URL}/v1/spatial/${spatialId}/estimate`, { method: "POST" });
+        const wtParam = walkthroughId ? `?walkthrough_id=${walkthroughId}` : "";
+        const res = await fetch(`${API_URL}/v1/spatial/${spatialId}/estimate${wtParam}`, { method: "POST" });
         if (res.ok) {
           setEstimate(await res.json());
           return;
@@ -55,7 +57,7 @@ export default function EstimateViewPage() {
       }
     }
     fetchEstimate();
-  }, [spatialId]);
+  }, [spatialId, walkthroughId]);
 
   if (loading) {
     return (
@@ -252,6 +254,9 @@ export default function EstimateViewPage() {
           <Card className="p-4 mb-4 rounded-xl border border-border/50 bg-muted/20">
             <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Source</h3>
             <p className="text-[10px] text-foreground">{provenance.source}</p>
+            {provenance.walkthrough_status && (
+              <p className="text-[10px] text-muted-foreground mt-1">{provenance.walkthrough_status}</p>
+            )}
             {provenance.pipeline_version && (
               <p className="text-[10px] text-muted-foreground mt-0.5">Pipeline v{provenance.pipeline_version}</p>
             )}
@@ -279,5 +284,17 @@ export default function EstimateViewPage() {
 
       <BottomNav />
     </div>
+  );
+}
+
+export default function EstimateViewPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-[430px] mx-auto min-h-[100dvh] flex items-center justify-center bg-background shadow-xl">
+        <ParapetLogo size={48} className="text-[#1E3A5F] animate-pulse" />
+      </div>
+    }>
+      <EstimateViewContent />
+    </Suspense>
   );
 }
