@@ -130,9 +130,9 @@ export default function DashboardPage() {
             <Bell size={20} className="text-muted-foreground" />
             <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-red-500" />
           </button>
-          <div className="w-8 h-8 rounded-full bg-[#1E3A5F] flex items-center justify-center">
+          <Link href="/account" className="w-8 h-8 rounded-full bg-[#1E3A5F] flex items-center justify-center">
             <span className="text-[11px] font-bold text-white">JD</span>
-          </div>
+          </Link>
         </div>
       </header>
 
