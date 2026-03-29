@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ParapetLogo from "@/components/ParapetLogo";
+import LoginButton from "@/components/LoginButton";
 import { Button } from "@/components/ui/button";
 import {
   Shield, Eye, Scale, Brain, BarChart3, Gavel,
@@ -50,7 +51,12 @@ export default function WelcomePage() {
     <div className="min-h-screen flex flex-col bg-background">
       {/* Hero — full-width navy gradient, centered content */}
       <div className="parapet-gradient w-full">
-        <div className="max-w-3xl mx-auto flex flex-col items-center justify-center px-6 pt-16 pb-10 md:pt-24 md:pb-16 text-white">
+        {/* Top bar with login */}
+        <div className="max-w-3xl mx-auto flex justify-end px-6 pt-4">
+          <LoginButton />
+        </div>
+
+        <div className="max-w-3xl mx-auto flex flex-col items-center justify-center px-6 pt-8 pb-10 md:pt-16 md:pb-16 text-white">
           <ParapetLogo size={56} className="text-white mb-5 md:mb-6" />
           <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-center mb-2">
             PARAPET
