@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, Pencil, Check,
   Mail, Phone, MapPin,
   KeyRound, Shield, FileText, HelpCircle,
-  Bell, MessageSquare, LogOut,
+  Bell, MessageSquare, LogOut, DollarSign,
 } from "lucide-react";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -407,50 +407,11 @@ export default function AccountPage() {
           <h2 className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-2">
             Payment Methods
           </h2>
-          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 space-y-3">
-            {/* Visa */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-7 rounded bg-[#1A6B3C] flex items-center justify-center flex-shrink-0">
-                <span className="text-[9px] font-bold text-white tracking-wide">VISA</span>
-              </div>
-              <div className="flex-1">
-                <p className="text-[13px] text-[#1E3A5F] font-medium">Visa ····4242</p>
-                <p className="text-[11px] text-[#64748B]">Expires 12/26</p>
-              </div>
-            </div>
-            <div className="border-b border-[#F1F5F9]" />
-
-            {/* Mastercard */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-7 rounded bg-[#EB001B] flex items-center justify-center flex-shrink-0 relative overflow-hidden">
-                <div className="w-4 h-4 rounded-full bg-[#EB001B] absolute left-1.5" />
-                <div className="w-4 h-4 rounded-full bg-[#F79E1B] absolute right-1.5 opacity-80" />
-              </div>
-              <div className="flex-1">
-                <p className="text-[13px] text-[#1E3A5F] font-medium">Mastercard ····8888</p>
-                <p className="text-[11px] text-[#64748B]">Expires 08/27</p>
-              </div>
-            </div>
-            <div className="border-b border-[#F1F5F9]" />
-
-            {/* Apple Pay */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-7 rounded bg-black flex items-center justify-center flex-shrink-0">
-                <span className="text-[9px] font-bold text-white"> Pay</span>
-              </div>
-              <div className="flex-1">
-                <p className="text-[13px] text-[#1E3A5F] font-medium">Apple Pay</p>
-                <p className="text-[11px] text-[#64748B]">Connected</p>
-              </div>
-            </div>
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 flex flex-col items-center justify-center text-center py-8">
+            <DollarSign size={24} className="text-[#64748B] mb-2" />
+            <p className="text-[14px] font-medium text-[#1E3A5F]">Payment methods coming soon</p>
+            <p className="text-[12px] text-[#64748B] mt-1">We&apos;ll notify you when payment processing is available.</p>
           </div>
-
-          <button
-            onClick={() => toast({ title: "Payment methods", description: "Payment methods will be available soon." })}
-            className="w-full mt-3 py-2.5 text-[13px] font-semibold text-[#1E3A5F] border border-[#E2E8F0] rounded-xl bg-white hover:bg-gray-50 transition-colors"
-          >
-            + Add Payment Method
-          </button>
         </section>
 
         {/* ── Subscription ── */}

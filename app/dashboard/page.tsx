@@ -9,7 +9,7 @@ import {
   Users, AlertTriangle, Scan, PenTool, Palette, Scale,
   Shield, Gavel, FileCheck, MapPin, DollarSign,
   CalendarRange, Hammer, Bug, FolderArchive, Package,
-  ChevronRight,
+  ChevronRight, User,
 } from "lucide-react";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -38,10 +38,23 @@ export default function DashboardPage() {
   const [latestReport, setLatestReport] = useState<any>(null);
   const [latestSpatialId, setLatestSpatialId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userInitials, setUserInitials] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
       try {
+        // Fetch user profile for avatar initials
+        try {
+          const profileRes = await fetch(`${API_URL}/v1/users/profile`);
+          if (profileRes.ok) {
+            const profile = await profileRes.json();
+            const first = profile.first_name;
+            const last = profile.last_name;
+            if (first && last) setUserInitials(`${first[0]}${last[0]}`.toUpperCase());
+            else if (first) setUserInitials(first[0].toUpperCase());
+          }
+        } catch { /* profile fetch optional */ }
+
         // Fetch readiness reports
         const res = await fetch(`${API_URL}/v1/readiness-reports`);
         if (res.ok) {
@@ -131,7 +144,11 @@ export default function DashboardPage() {
             <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-red-500" />
           </button>
           <Link href="/account" className="w-8 h-8 rounded-full bg-[#1E3A5F] flex items-center justify-center">
-            <span className="text-[11px] font-bold text-white">JD</span>
+            {userInitials ? (
+              <span className="text-[11px] font-bold text-white">{userInitials}</span>
+            ) : (
+              <User size={16} className="text-white" />
+            )}
           </Link>
         </div>
       </header>
