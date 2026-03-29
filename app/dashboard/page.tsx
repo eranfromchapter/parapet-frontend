@@ -111,7 +111,7 @@ export default function DashboardPage() {
   const discovery: PhaseModule[] = [
     { label: "Space Capture", href: "/capture", icon: Scan, status: "active" },
     { label: "Readiness Report", href: hasReport ? `/readiness/${reportId}` : "#", icon: FileText, status: hasReport ? "completed" : "pending" },
-    { label: "Scope Editor", href: latestSpatialId ? `/scope/${latestSpatialId}` : "/scope/demo", icon: PenTool, status: latestSpatialId ? "active" : "pending" },
+    { label: "Scope Editor", href: latestSpatialId ? `/scope/${latestSpatialId}` : hasReport ? `/scope/report-${reportId}` : "/scope/demo", icon: PenTool, status: latestSpatialId || hasReport ? "active" : "pending" },
     { label: "Design Studio", href: "#", icon: Palette, status: "pending" },
   ];
   const bidding: PhaseModule[] = [

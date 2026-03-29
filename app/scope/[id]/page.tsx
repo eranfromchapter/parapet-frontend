@@ -84,6 +84,8 @@ export default function ScopeEditorPage() {
   const router = useRouter();
   const scopeId = params.id as string;
   const isDemo = scopeId === "demo";
+  const isReportBased = scopeId.startsWith("report-");
+  const actualReportId = isReportBased ? scopeId.replace("report-", "") : null;
 
   const [items, setItems] = useState<any[]>([]);
   const [estimate, setEstimate] = useState<any>(null);
@@ -102,12 +104,54 @@ export default function ScopeEditorPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/v1/spatial/${scopeId}/estimate`, { method: "POST", headers: getAuthHeaders() });
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        throw new Error(body || `Failed to load estimate (${res.status})`);
+      let data: any;
+
+      if (isReportBased && actualReportId) {
+        // Load scope from readiness report's cost breakdown
+        const res = await fetch(`${API_URL}/v1/readiness-reports/${actualReportId}`, {
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) throw new Error(`Failed to load report (${res.status})`);
+        const report = await res.json();
+        const rj = report.report_json;
+        if (!rj?.cost_estimate?.breakdown_by_category) {
+          throw new Error("Report has no cost breakdown data");
+        }
+
+        const breakdown = rj.cost_estimate.breakdown_by_category;
+        const lineItems = (Array.isArray(breakdown)
+          ? breakdown
+          : Object.entries(breakdown).map(([cat, amount]: [string, any]) => ({
+              description: cat,
+              category: cat,
+              subtotal: typeof amount === "number" ? amount : amount?.amount ?? amount?.expected ?? 0,
+              room: "General",
+            }))
+        ).map((item: any, i: number) => ({
+          item_code: `RR-${String(i + 1).padStart(3, "0")}`,
+          description: item.description || item.category || item.name || `Item ${i + 1}`,
+          category: item.category || "General",
+          room: item.room || "General",
+          subtotal: item.subtotal || item.amount || item.expected || 0,
+          quantity: item.quantity || "",
+          confidence_score: item.confidence_score || rj.calibration?.historical_accuracy_pct || null,
+          pricing_source: "Readiness Report",
+        }));
+
+        data = { line_items: lineItems, provenance: rj.provenance || {} };
+      } else {
+        // Original spatial-based estimate
+        const res = await fetch(`${API_URL}/v1/spatial/${scopeId}/estimate`, {
+          method: "POST",
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          throw new Error(body || `Failed to load estimate (${res.status})`);
+        }
+        data = await res.json();
       }
-      const data = await res.json();
+
       setEstimate(data);
       const transformed = transformLineItems(data.line_items ?? []);
       setItems(transformed);
@@ -116,7 +160,7 @@ export default function ScopeEditorPage() {
     } finally {
       setLoading(false);
     }
-  }, [scopeId, isDemo]);
+  }, [scopeId, isDemo, isReportBased, actualReportId]);
 
   useEffect(() => { fetchEstimate(); }, [fetchEstimate]);
 
@@ -167,7 +211,11 @@ export default function ScopeEditorPage() {
       <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col items-center justify-center bg-[#FAFBFC] px-6 shadow-xl">
         <ParapetLogo size={48} className="text-[#1E3A5F] mb-6" />
         <h1 className="text-lg font-bold text-foreground mb-2">No estimate data yet</h1>
-        <p className="text-sm text-muted-foreground text-center mb-6">Upload a Polycam scan to generate a detailed scope of work.</p>
+        <p className="text-sm text-muted-foreground text-center mb-6">
+          {isReportBased
+            ? "No cost breakdown data in this report yet."
+            : "Upload a Polycam scan to generate a detailed scope of work."}
+        </p>
         <button onClick={() => router.push("/capture")} className="px-6 py-3 bg-[#1E3A5F] text-white rounded-xl text-sm font-medium hover:bg-[#2A4F7A]">Go to Space Capture</button>
       </div>
     );
