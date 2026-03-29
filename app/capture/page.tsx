@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BottomNav from "@/components/BottomNav";
+import { getAuthHeaders } from "@/lib/auth";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -192,6 +193,8 @@ export default function SpaceCapturePage() {
       xhr.addEventListener("timeout", () => resolve({ ok: false, error: "Upload timed out" }));
       xhr.timeout = 600_000; // 10 min timeout for large files
       xhr.open("POST", url);
+      const authHeaders = getAuthHeaders();
+      Object.entries(authHeaders).forEach(([k, v]) => xhr.setRequestHeader(k, v));
       xhr.send(formData);
     });
   }, []);
@@ -210,7 +213,7 @@ export default function SpaceCapturePage() {
         setUploadProgress("Uploading LiDAR scan...");
         const fd = new FormData();
         fd.append("file", file);
-        const res = await fetch(`${API_URL}/v1/spatial/upload`, { method: "POST", body: fd });
+        const res = await fetch(`${API_URL}/v1/spatial/upload`, { method: "POST", body: fd, headers: getAuthHeaders() });
         if (!res.ok) {
           const errBody = await res.text().catch(() => "");
           throw new Error(errBody || `Upload failed: ${res.status}`);
@@ -242,7 +245,7 @@ export default function SpaceCapturePage() {
 
         if (wid) {
           setUploadProgress("Starting transcription...");
-          await fetch(`${API_URL}/v1/walkthrough/${wid}/transcribe`, { method: "POST" });
+          await fetch(`${API_URL}/v1/walkthrough/${wid}/transcribe`, { method: "POST", headers: getAuthHeaders() });
         }
         setToast("Video uploaded! Transcription started.");
       } else if (["jpg", "jpeg", "png", "heic"].includes(ext)) {
@@ -313,7 +316,7 @@ export default function SpaceCapturePage() {
           setWalkthroughId(wid || null);
           if (wid) {
             setUploadProgress("Starting transcription...");
-            await fetch(`${API_URL}/v1/walkthrough/${wid}/transcribe`, { method: "POST" });
+            await fetch(`${API_URL}/v1/walkthrough/${wid}/transcribe`, { method: "POST", headers: getAuthHeaders() });
           }
           setToast("Video recorded and uploaded!");
         } catch (err) {

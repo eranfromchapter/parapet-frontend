@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ParapetLogo from "@/components/ParapetLogo";
+import { getAuthHeaders } from "@/lib/auth";
 
 const ANALYSIS_STEPS = [
   { label: "Analyzing market data", duration: 3500 },
@@ -65,7 +66,9 @@ function GeneratingContent() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
-      const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}`);
+      const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}`, {
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error(`Status ${res.status}`);
       const data = await res.json();
 

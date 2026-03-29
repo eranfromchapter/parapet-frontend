@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ParapetLogo from "@/components/ParapetLogo";
+import { getAuthHeaders } from "@/lib/auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
 
@@ -61,7 +62,7 @@ function EstimateGeneratingContent() {
 
         if (spatialId) {
           promises.push(
-            fetch(`${API_URL}/v1/spatial/${spatialId}/estimate${walkthroughId ? `?walkthrough_id=${walkthroughId}` : ""}`, { method: "POST" })
+            fetch(`${API_URL}/v1/spatial/${spatialId}/estimate${walkthroughId ? `?walkthrough_id=${walkthroughId}` : ""}`, { method: "POST", headers: getAuthHeaders() })
               .then(async (res) => {
                 if (!res.ok) {
                   const text = await res.text().catch(() => "");
@@ -76,7 +77,7 @@ function EstimateGeneratingContent() {
 
         if (walkthroughId) {
           promises.push(
-            fetch(`${API_URL}/v1/walkthrough/${walkthroughId}/analyze`, { method: "POST" })
+            fetch(`${API_URL}/v1/walkthrough/${walkthroughId}/analyze`, { method: "POST", headers: getAuthHeaders() })
               .then(async (res) => {
                 if (!res.ok && res.status !== 409) {
                   // 409 = already analyzing/analyzed, that's fine
@@ -165,7 +166,9 @@ function EstimateGeneratingContent() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/v1/walkthrough/${walkthroughId}`);
+      const res = await fetch(`${API_URL}/v1/walkthrough/${walkthroughId}`, {
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) return;
       const data = await res.json();
 

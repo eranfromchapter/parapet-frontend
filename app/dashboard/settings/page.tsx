@@ -1,9 +1,36 @@
-import React from 'react';
+'use client';
+
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { User, Mail, CreditCard } from 'lucide-react';
+import { getAuthHeaders } from '@/lib/auth';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
 
 export default function SettingsPage() {
+  const [profile, setProfile] = useState<any>(null);
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const res = await fetch(`${API_URL}/v1/users/profile`, {
+          headers: getAuthHeaders(),
+        });
+        if (res.ok) setProfile(await res.json());
+      } catch { /* silently fail */ }
+    }
+    loadProfile();
+  }, []);
+
+  const displayName = profile
+    ? [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "User"
+    : "Loading...";
+  const displayEmail = profile?.email || "—";
+  const tierLabel = profile?.tier_display_name || profile?.tier || "Free";
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <h1 className="text-2xl font-bold text-navy">Settings</h1>
@@ -20,8 +47,8 @@ export default function SettingsPage() {
               <User className="h-8 w-8 text-navy" />
             </div>
             <div>
-              <p className="font-semibold text-navy">Homeowner</p>
-              <p className="text-sm text-slate-500">homeowner@example.com</p>
+              <p className="font-semibold text-navy">{displayName}</p>
+              <p className="text-sm text-slate-500">{displayEmail}</p>
             </div>
           </div>
         </CardContent>
@@ -37,9 +64,9 @@ export default function SettingsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium text-slate-700">Current Plan</p>
-              <p className="text-sm text-slate-500">Free tier — Readiness Reports only</p>
+              <p className="text-sm text-slate-500">{tierLabel} tier</p>
             </div>
-            <Badge>Free</Badge>
+            <Badge>{tierLabel}</Badge>
           </div>
         </CardContent>
       </Card>

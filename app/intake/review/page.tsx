@@ -91,6 +91,11 @@ export default function IntakeReview() {
       const data = await res.json();
       const reportId = data.id || data.report_id;
 
+      // Store auth token — this is the user's real identity
+      if (data.access_token) {
+        localStorage.setItem("parapet_token", data.access_token);
+      }
+
       if (!reportId) {
         throw new Error("No report ID in response");
       }

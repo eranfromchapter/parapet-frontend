@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import ParapetLogo from "@/components/ParapetLogo";
 import BottomNav from "@/components/BottomNav";
+import { getAuthHeaders } from "@/lib/auth";
 import {
   Bell, Plus, ArrowRight, Camera, FileText, BarChart3,
   Users, AlertTriangle, Scan, PenTool, Palette, Scale,
@@ -45,7 +46,9 @@ export default function DashboardPage() {
       try {
         // Fetch user profile for avatar initials
         try {
-          const profileRes = await fetch(`${API_URL}/v1/users/profile`);
+          const profileRes = await fetch(`${API_URL}/v1/users/profile`, {
+            headers: getAuthHeaders(),
+          });
           if (profileRes.ok) {
             const profile = await profileRes.json();
             const first = profile.first_name;
@@ -56,20 +59,26 @@ export default function DashboardPage() {
         } catch { /* profile fetch optional */ }
 
         // Fetch readiness reports
-        const res = await fetch(`${API_URL}/v1/readiness-reports`);
+        const res = await fetch(`${API_URL}/v1/readiness-reports`, {
+          headers: getAuthHeaders(),
+        });
         if (res.ok) {
           const data = await res.json();
           const reports: any[] = Array.isArray(data) ? data : data.reports ?? data.items ?? [];
           const completed = reports.find((r: any) => r.status === "completed");
           if (completed) {
-            const fullRes = await fetch(`${API_URL}/v1/readiness-reports/${completed.id}`);
+            const fullRes = await fetch(`${API_URL}/v1/readiness-reports/${completed.id}`, {
+              headers: getAuthHeaders(),
+            });
             if (fullRes.ok) setLatestReport(await fullRes.json());
           }
         }
 
         // Fetch walkthroughs to find spatial_id
         try {
-          const wtRes = await fetch(`${API_URL}/v1/walkthrough`);
+          const wtRes = await fetch(`${API_URL}/v1/walkthrough`, {
+            headers: getAuthHeaders(),
+          });
           if (wtRes.ok) {
             const wts = await wtRes.json();
             const wtList: any[] = Array.isArray(wts) ? wts : [];

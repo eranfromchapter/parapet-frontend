@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import ParapetLogo from "@/components/ParapetLogo";
 import BottomNav from "@/components/BottomNav";
+import { getAuthHeaders } from "@/lib/auth";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -95,7 +96,9 @@ export default function ReadinessReportPage() {
   const fetchReport = useCallback(async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
-      const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}`);
+      const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}`, {
+        headers: getAuthHeaders(),
+      });
 
       if (res.status === 404) {
         setError("Report not found");

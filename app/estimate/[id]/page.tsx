@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import ParapetLogo from "@/components/ParapetLogo";
 import BottomNav from "@/components/BottomNav";
+import { getAuthHeaders } from "@/lib/auth";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -34,14 +35,14 @@ function EstimateViewContent() {
     async function fetchEstimate() {
       try {
         const wtParam = walkthroughId ? `?walkthrough_id=${walkthroughId}` : "";
-        const res = await fetch(`${API_URL}/v1/spatial/${spatialId}/estimate${wtParam}`, { method: "POST" });
+        const res = await fetch(`${API_URL}/v1/spatial/${spatialId}/estimate${wtParam}`, { method: "POST", headers: getAuthHeaders() });
         if (res.ok) {
           setEstimate(await res.json());
           return;
         }
 
         // Fallback: check if the spatial model has cached estimate data
-        const getRes = await fetch(`${API_URL}/v1/spatial/${spatialId}`);
+        const getRes = await fetch(`${API_URL}/v1/spatial/${spatialId}`, { headers: getAuthHeaders() });
         if (!getRes.ok) throw new Error(`Spatial model not found (${getRes.status})`);
         const data = await getRes.json();
         if (data.estimate) {

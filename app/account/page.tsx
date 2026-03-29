@@ -10,6 +10,7 @@ import {
   KeyRound, Shield, FileText, HelpCircle,
   Bell, MessageSquare, LogOut, DollarSign,
 } from "lucide-react";
+import { getAuthHeaders, clearAuth } from "@/lib/auth";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -50,7 +51,9 @@ interface UserProfile {
 // ── API helpers ──
 
 async function fetchProfile(): Promise<UserProfile> {
-  const res = await fetch(`${API_URL}/v1/users/profile`);
+  const res = await fetch(`${API_URL}/v1/users/profile`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error("Failed to fetch profile");
   return res.json();
 }
@@ -58,7 +61,7 @@ async function fetchProfile(): Promise<UserProfile> {
 async function updateProfile(data: Record<string, any>): Promise<UserProfile> {
   const res = await fetch(`${API_URL}/v1/users/profile`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to update profile");
@@ -68,7 +71,7 @@ async function updateProfile(data: Record<string, any>): Promise<UserProfile> {
 async function updatePreferences(data: Partial<Preferences>): Promise<Preferences> {
   const res = await fetch(`${API_URL}/v1/users/preferences`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to update preferences");
@@ -205,6 +208,7 @@ export default function AccountPage() {
   };
 
   const handleSignOut = () => {
+    clearAuth();
     toast({ title: "Signed out successfully" });
     router.push("/");
   };

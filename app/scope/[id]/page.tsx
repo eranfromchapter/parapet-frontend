@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import BottomNav from "@/components/BottomNav";
 import ParapetLogo from "@/components/ParapetLogo";
+import { getAuthHeaders } from "@/lib/auth";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -101,7 +102,7 @@ export default function ScopeEditorPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_URL}/v1/spatial/${scopeId}/estimate`, { method: "POST" });
+      const res = await fetch(`${API_URL}/v1/spatial/${scopeId}/estimate`, { method: "POST", headers: getAuthHeaders() });
       if (!res.ok) {
         const body = await res.text().catch(() => "");
         throw new Error(body || `Failed to load estimate (${res.status})`);

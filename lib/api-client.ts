@@ -1,3 +1,5 @@
+import { getAuthHeaders } from './auth';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
 if (!API_BASE) {
@@ -20,8 +22,13 @@ async function fetchWithRetry(url: string, options: FetchOptions = {}, retries =
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+  // Merge auth headers with any existing headers
+  const authHeaders = getAuthHeaders();
+  const existingHeaders = (fetchOptions.headers as Record<string, string>) || {};
+  const mergedHeaders = { ...authHeaders, ...existingHeaders };
+
   try {
-    const response = await fetch(url, { ...fetchOptions, signal: controller.signal });
+    const response = await fetch(url, { ...fetchOptions, headers: mergedHeaders, signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (!response.ok) {
