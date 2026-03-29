@@ -51,7 +51,7 @@ export default function GeneratingPage({ params }: { params: { jobId: string } }
 
     const timerInterval = setInterval(() => {
       setElapsed((e) => {
-        if (e >= 120) {
+        if (e >= 180) {
           setTimedOut(true);
           clearInterval(pollInterval);
           clearInterval(timerInterval);

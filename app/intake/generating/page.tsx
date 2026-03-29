@@ -13,7 +13,7 @@ const ANALYSIS_STEPS = [
 ];
 
 const TOTAL_DURATION = ANALYSIS_STEPS.reduce((sum, s) => sum + s.duration, 0);
-const HARD_TIMEOUT_MS = 90_000; // 90 seconds
+const HARD_TIMEOUT_MS = 180_000; // 180 seconds
 
 function GeneratingContent() {
   const router = useRouter();
@@ -81,7 +81,7 @@ function GeneratingContent() {
       // Still processing — keep polling
     } catch {
       pollCount.current++;
-      if (pollCount.current >= 15) {
+      if (pollCount.current >= 30) {
         setErrorState("timeout");
       }
     }
@@ -89,7 +89,7 @@ function GeneratingContent() {
 
   useEffect(() => {
     if (!reportId) return;
-    const interval = setInterval(pollReport, 2000);
+    const interval = setInterval(pollReport, 3000);
     return () => clearInterval(interval);
   }, [reportId, pollReport]);
 
