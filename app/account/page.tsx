@@ -115,6 +115,9 @@ export default function AccountPage() {
   const [saving, setSaving] = useState(false);
 
   // Edit form state
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editStreet, setEditStreet] = useState("");
   const [editUnit, setEditUnit] = useState("");
@@ -143,6 +146,9 @@ export default function AccountPage() {
   // Populate edit fields when entering edit mode
   const startEditing = () => {
     if (!profile) return;
+    setEditFirstName(profile.first_name || "");
+    setEditLastName(profile.last_name || "");
+    setEditEmail(profile.email || "");
     setEditPhone(profile.phone || "");
     setEditStreet(profile.address?.street || "");
     setEditUnit(profile.address?.unit || "");
@@ -156,6 +162,9 @@ export default function AccountPage() {
     setSaving(true);
     try {
       const data = await updateProfile({
+        first_name: editFirstName || null,
+        last_name: editLastName || null,
+        email: editEmail || null,
         phone: editPhone || null,
         address: {
           street: editStreet || null,
@@ -295,14 +304,34 @@ export default function AccountPage() {
             {/* First Name */}
             <div className="py-2">
               <p className="text-[11px] text-[#64748B] uppercase mb-0.5">First Name</p>
-              <p className="text-[14px] text-[#1E3A5F] font-medium">{profile.first_name || "—"}</p>
+              {editing ? (
+                <input
+                  type="text"
+                  value={editFirstName}
+                  onChange={(e) => setEditFirstName(e.target.value)}
+                  placeholder="First name"
+                  className="w-full text-[14px] text-[#1E3A5F] font-medium bg-transparent border-b border-[#1E3A5F]/30 outline-none focus:border-[#1E3A5F] pb-0.5"
+                />
+              ) : (
+                <p className="text-[14px] text-[#1E3A5F] font-medium">{profile.first_name || "—"}</p>
+              )}
             </div>
             <div className="border-b border-[#F1F5F9]" />
 
             {/* Last Name */}
             <div className="py-2">
               <p className="text-[11px] text-[#64748B] uppercase mb-0.5">Last Name</p>
-              <p className="text-[14px] text-[#1E3A5F] font-medium">{profile.last_name || "—"}</p>
+              {editing ? (
+                <input
+                  type="text"
+                  value={editLastName}
+                  onChange={(e) => setEditLastName(e.target.value)}
+                  placeholder="Last name"
+                  className="w-full text-[14px] text-[#1E3A5F] font-medium bg-transparent border-b border-[#1E3A5F]/30 outline-none focus:border-[#1E3A5F] pb-0.5"
+                />
+              ) : (
+                <p className="text-[14px] text-[#1E3A5F] font-medium">{profile.last_name || "—"}</p>
+              )}
             </div>
             <div className="border-b border-[#F1F5F9]" />
 
@@ -311,7 +340,17 @@ export default function AccountPage() {
               <Mail size={16} className="text-[#64748B] flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-[#64748B] uppercase mb-0.5">Email</p>
-                <p className="text-[14px] text-[#1E3A5F] font-medium truncate">{profile.email || "—"}</p>
+                {editing ? (
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    placeholder="email@example.com"
+                    className="w-full text-[14px] text-[#1E3A5F] font-medium bg-transparent border-b border-[#1E3A5F]/30 outline-none focus:border-[#1E3A5F] pb-0.5"
+                  />
+                ) : (
+                  <p className="text-[14px] text-[#1E3A5F] font-medium truncate">{profile.email || "—"}</p>
+                )}
               </div>
             </div>
             <div className="border-b border-[#F1F5F9]" />
