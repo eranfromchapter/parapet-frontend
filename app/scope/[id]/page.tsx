@@ -48,9 +48,9 @@ const DEMO_ITEMS = [
 function transformLineItems(lineItems: any[]): any[] {
   return lineItems.map((li: any, i: number) => ({
     id: li.item_code ?? String(i),
-    name: li.description ?? li.scope_item ?? li.item_code ?? `Item ${i + 1}`,
-    category: li.category ?? "General",
-    room: li.room ?? "General",
+    name: (li.description ?? li.scope_item ?? li.item_code ?? `Item ${i + 1}`).replace(/_/g, " "),
+    category: (li.category ?? "General").replace(/_/g, " "),
+    room: (li.room ?? "General").replace(/_/g, " "),
     description: li.item_code ? `${li.item_code} \u2014 ${li.quantity ?? ""}` : (li.quantity ?? ""),
     lowPrice: typeof li.subtotal === "number" ? Math.round(li.subtotal * 0.85) : 0,
     highPrice: typeof li.subtotal === "number" ? Math.round(li.subtotal * 1.15) : 0,
@@ -64,7 +64,7 @@ function transformLineItems(lineItems: any[]): any[] {
 function groupByRoom(items: any[]): { name: string; total: number; items: any[] }[] {
   const byRoom: Record<string, any[]> = {};
   for (const item of items) {
-    const room = item.room || "General";
+    const room = (item.room || "General").replace(/_/g, " ");
     if (!byRoom[room]) byRoom[room] = [];
     byRoom[room].push(item);
   }
@@ -122,16 +122,16 @@ export default function ScopeEditorPage() {
         const lineItems = (Array.isArray(breakdown)
           ? breakdown
           : Object.entries(breakdown).map(([cat, amount]: [string, any]) => ({
-              description: cat,
-              category: cat,
+              description: (cat || "").replace(/_/g, " "),
+              category: (cat || "").replace(/_/g, " "),
               subtotal: typeof amount === "number" ? amount : amount?.amount ?? amount?.expected ?? 0,
               room: "General",
             }))
         ).map((item: any, i: number) => ({
           item_code: `RR-${String(i + 1).padStart(3, "0")}`,
-          description: item.description || item.category || item.name || `Item ${i + 1}`,
-          category: item.category || "General",
-          room: item.room || "General",
+          description: (item.description || item.category || item.name || `Item ${i + 1}`).replace(/_/g, " "),
+          category: (item.category || "General").replace(/_/g, " "),
+          room: (item.room || "General").replace(/_/g, " "),
           subtotal: item.subtotal || item.amount || item.expected || 0,
           quantity: item.quantity || "",
           confidence_score: item.confidence_score || rj.calibration?.historical_accuracy_pct || null,
@@ -296,18 +296,20 @@ export default function ScopeEditorPage() {
                   {items.map((item: any) => (
                     <div key={item.id} className={`bg-white border border-[#E8ECF1] rounded-xl p-4 transition-opacity ${item.enabled ? "" : "opacity-60"}`}>
                       <div className="flex items-start justify-between mb-1">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <p className={`text-sm font-semibold ${item.enabled ? "text-foreground" : "text-muted-foreground"}`}>{item.name}</p>
-                          <span className="text-[11px] bg-[#F0F4F8] text-muted-foreground font-medium px-2.5 py-0.5 rounded-full shrink-0">{item.category}</span>
+                        <div className="flex-1 min-w-0 pr-3">
+                          <p className={`text-sm font-semibold leading-tight ${item.enabled ? "text-foreground" : "text-muted-foreground"}`}>{item.name}</p>
+                          {item.id && (
+                            <p className="text-[10px] text-muted-foreground/60 mt-0.5">{item.id}</p>
+                          )}
                         </div>
                         <button
                           onClick={() => toggleItem(item.id)}
-                          className={`w-10 h-[22px] rounded-full relative transition-colors shrink-0 ml-2 ${item.enabled ? "bg-[#1E3A5F]" : "bg-gray-300"}`}
+                          className={`w-10 h-[22px] rounded-full relative transition-colors shrink-0 ${item.enabled ? "bg-[#1E3A5F]" : "bg-gray-300"}`}
                         >
                           <span className={`absolute top-[2px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform ${item.enabled ? "left-[20px]" : "left-[2px]"}`} />
                         </button>
                       </div>
-                      {item.description && (
+                      {item.description && item.description !== item.name && !item.description.startsWith("RR-") && (
                         <p className={`text-xs leading-relaxed mb-2 ${item.enabled ? "text-muted-foreground" : "text-muted-foreground/70"}`}>{item.description}</p>
                       )}
                       <div className="flex items-center justify-between">
