@@ -112,7 +112,7 @@ export default function DashboardPage() {
     { label: "Space Capture", href: "/capture", icon: Scan, status: "active" },
     { label: "Readiness Report", href: hasReport ? `/readiness/${reportId}` : "#", icon: FileText, status: hasReport ? "completed" : "pending" },
     { label: "Scope Editor", href: latestSpatialId ? `/scope/${latestSpatialId}` : hasReport ? `/scope/report-${reportId}` : "/scope/demo", icon: PenTool, status: latestSpatialId || hasReport ? "active" : "pending" },
-    { label: "Design Studio", href: "#", icon: Palette, status: "pending" },
+    { label: "Design Studio", href: "/design", icon: Palette, status: "active" },
   ];
   const bidding: PhaseModule[] = [
     { label: "Bid Comparison", href: "#", icon: Scale, status: "pending" },
