@@ -50,7 +50,6 @@ export default function DesignVisionPage() {
         if (!res.ok) throw new Error(`Failed to load spatial data (${res.status})`);
         const data = await res.json();
         const rawRooms: any[] = data.rooms ?? [];
-        console.log("Spatial rooms:", JSON.stringify(rawRooms));
         if (rawRooms.length === 0) {
           setRoomsError("no_rooms");
           setRoomsLoading(false);
@@ -62,7 +61,7 @@ export default function DesignVisionPage() {
               ? r.resolved_type.resolved_type || r.resolved_type.original_name || r.name || "Room"
               : r.resolved_type || r.name || "Room"
           ).replace(/_/g, " "),
-          sqft: Math.round(r.floor_area_sf ?? r.floor_area ?? 0),
+          sqft: Math.round(r.overview?.floor_area_sf ?? r.floor_area_sf ?? r.floor_area ?? 0),
           features: [...(r.fixtures ?? []), ...(r.appliances ?? [])]
             .map((f: any) => typeof f === "string" ? f : f.name ?? f.type ?? "")
             .filter(Boolean)
