@@ -1,41 +1,77 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Sparkles, Home, ImagePlus, Lightbulb, Link2, Tag, Mic,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
+import ParapetLogo from "@/components/ParapetLogo";
 import { getAuthHeaders } from "@/lib/auth";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
 
-const STATIC_ROOMS = [
-  { name: "Kitchen", sqft: 160, features: "Cabinets, Island, Sink" },
-  { name: "Bathroom 1", sqft: 80, features: "Shower, Vanity" },
-  { name: "Bathroom 2", sqft: 60, features: "Tub, Vanity" },
-  { name: "Living Room", sqft: 770, features: "Open plan, Fireplace" },
-  { name: "Bedroom 1", sqft: 180, features: "Closet, En-suite" },
-  { name: "Bedroom 2", sqft: 150, features: "Closet" },
-];
-
 const STYLE_KEYWORDS = [
   "Modern", "Minimalist", "Scandinavian", "Industrial", "Bohemian", "Farmhouse",
   "Mid-Century", "Traditional", "Coastal", "Contemporary", "Art Deco", "Japandi",
 ];
 
+interface Room {
+  name: string;
+  sqft: number;
+  features: string;
+}
+
 export default function DesignVisionPage() {
   const router = useRouter();
-  const [rooms] = useState(STATIC_ROOMS);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(true);
+  const [roomsError, setRoomsError] = useState<string | null>(null);
   const [selectedRoom, setSelectedRoom] = useState(0);
   const [visionText, setVisionText] = useState("");
   const [linkInput, setLinkInput] = useState("");
   const [links, setLinks] = useState<string[]>([]);
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    async function loadRooms() {
+      const spatialId = (() => { try { return localStorage.getItem("parapet_spatial_id"); } catch { return null; } })();
+      if (!spatialId) {
+        setRoomsError("no_scan");
+        setRoomsLoading(false);
+        return;
+      }
+      try {
+        const res = await fetch(`${API_URL}/v1/spatial/${spatialId}`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error(`Failed to load spatial data (${res.status})`);
+        const data = await res.json();
+        const rawRooms: any[] = data.rooms ?? [];
+        if (rawRooms.length === 0) {
+          setRoomsError("no_rooms");
+          setRoomsLoading(false);
+          return;
+        }
+        setRooms(rawRooms.map((r: any) => ({
+          name: (r.resolved_type ?? r.name ?? "Room").replace(/_/g, " "),
+          sqft: Math.round(r.floor_area_sf ?? r.floor_area ?? 0),
+          features: [...(r.fixtures ?? []), ...(r.appliances ?? [])]
+            .map((f: any) => typeof f === "string" ? f : f.name ?? f.type ?? "")
+            .filter(Boolean)
+            .map((s: string) => s.replace(/_/g, " "))
+            .join(", ") || "No fixtures detected",
+        })));
+      } catch (err) {
+        setRoomsError(err instanceof Error ? err.message : "Failed to load rooms");
+      } finally {
+        setRoomsLoading(false);
+      }
+    }
+    loadRooms();
+  }, []);
 
   const addLink = () => {
     const trimmed = linkInput.trim();
@@ -80,6 +116,37 @@ export default function DesignVisionPage() {
       setGenerating(false);
     }
   };
+
+  if (roomsLoading) {
+    return (
+      <div className="max-w-[430px] mx-auto min-h-[100dvh] flex items-center justify-center bg-[#FAFBFC] shadow-xl">
+        <div className="flex flex-col items-center gap-4">
+          <ParapetLogo size={48} className="text-[#1E3A5F] animate-pulse" />
+          <p className="text-sm text-muted-foreground">Loading rooms...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (roomsError) {
+    const noScan = roomsError === "no_scan";
+    return (
+      <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col items-center justify-center bg-[#FAFBFC] px-6 shadow-xl">
+        <ParapetLogo size={48} className="text-[#1E3A5F] mb-6" />
+        <h1 className="text-lg font-bold text-foreground mb-2">
+          {noScan ? "No space data yet" : "Could not load rooms"}
+        </h1>
+        <p className="text-sm text-muted-foreground text-center mb-6">
+          {noScan
+            ? "Upload a Polycam scan first so Design Studio can use your real room data."
+            : roomsError}
+        </p>
+        <button onClick={() => router.push("/capture")} className="px-6 py-3 bg-[#1E3A5F] text-white rounded-xl text-sm font-medium hover:bg-[#2A4F7A]">
+          Go to Space Capture
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-[#FAFBFC] relative shadow-xl">
