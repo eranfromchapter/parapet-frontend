@@ -56,7 +56,11 @@ export default function DesignVisionPage() {
           return;
         }
         setRooms(rawRooms.map((r: any) => ({
-          name: (r.resolved_type ?? r.name ?? "Room").replace(/_/g, " "),
+          name: String(
+            typeof r.resolved_type === "object" && r.resolved_type
+              ? r.resolved_type.resolved_type || r.resolved_type.original_name || r.name || "Room"
+              : r.resolved_type || r.name || "Room"
+          ).replace(/_/g, " "),
           sqft: Math.round(r.floor_area_sf ?? r.floor_area ?? 0),
           features: [...(r.fixtures ?? []), ...(r.appliances ?? [])]
             .map((f: any) => typeof f === "string" ? f : f.name ?? f.type ?? "")
