@@ -31,18 +31,6 @@ function getRoomIcon(name: string) {
   return ROOM_ICON_MAP[name] ?? { icon: Home, bg: "bg-gray-50" };
 }
 
-// ── Demo data (only used when id === "demo") ──
-
-const DEMO_ITEMS = [
-  { id: "1", name: "Cabinet Replacement", category: "Cabinetry", description: "Custom shaker-style, soft-close", lowPrice: 12000, highPrice: 16000, enabled: true },
-  { id: "2", name: "Countertop Installation", category: "Surfaces", description: "Quartz, waterfall edge option", lowPrice: 5500, highPrice: 8000, enabled: true },
-  { id: "3", name: "Electrical Upgrade", category: "Electrical", description: "Panel upgrade + dedicated circuits", lowPrice: 3200, highPrice: 4500, enabled: true },
-  { id: "4", name: "Plumbing Relocation", category: "Plumbing", description: "Sink moved to island", lowPrice: 4000, highPrice: 6000, enabled: true },
-  { id: "5", name: "Flooring", category: "Surfaces", description: "Engineered hardwood", lowPrice: 3500, highPrice: 5000, enabled: true },
-  { id: "6", name: "Backsplash Tile", category: "Surfaces", description: "Subway tile, herringbone pattern", lowPrice: 2000, highPrice: 3200, enabled: false },
-  { id: "7", name: "Lighting Design", category: "Electrical", description: "Recessed + pendant fixtures", lowPrice: 2800, highPrice: 4000, enabled: true },
-];
-
 // ── Transform API line items into scope items ──
 
 function transformLineItems(lineItems: any[]): any[] {
@@ -83,13 +71,19 @@ export default function ScopeEditorPage() {
   const params = useParams();
   const router = useRouter();
   const scopeId = params.id as string;
-  const isDemo = scopeId === "demo";
   const isReportBased = scopeId.startsWith("report-");
   const actualReportId = isReportBased ? scopeId.replace("report-", "") : null;
 
+  // Redirect demo/invalid routes — user must upload a scan first
+  useEffect(() => {
+    if (scopeId === "demo") {
+      router.replace("/capture");
+    }
+  }, [scopeId, router]);
+
   const [items, setItems] = useState<any[]>([]);
   const [estimate, setEstimate] = useState<any>(null);
-  const [loading, setLoading] = useState(!isDemo);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"scope" | "room">("scope");
   const [expandedRoom, setExpandedRoom] = useState<string | null>(null);
@@ -97,10 +91,7 @@ export default function ScopeEditorPage() {
 
   // Fetch real data
   const fetchEstimate = useCallback(async () => {
-    if (isDemo) {
-      setItems(DEMO_ITEMS);
-      return;
-    }
+    if (scopeId === "demo") return; // redirect handled above
     setLoading(true);
     setError(null);
     try {
@@ -160,7 +151,7 @@ export default function ScopeEditorPage() {
     } finally {
       setLoading(false);
     }
-  }, [scopeId, isDemo, isReportBased, actualReportId]);
+  }, [scopeId, isReportBased, actualReportId]);
 
   useEffect(() => { fetchEstimate(); }, [fetchEstimate]);
 
@@ -172,7 +163,7 @@ export default function ScopeEditorPage() {
   const provenance = estimate?.provenance ?? {};
   const projectLabel = provenance.rooms_parsed != null
     ? `${provenance.rooms_parsed} rooms scanned`
-    : isDemo ? "Kitchen Renovation \u2014 v3" : "Estimate";
+    : "Estimate";
 
   const toggleItem = (id: string) => {
     setItems(prev => prev.map((i: any) => i.id === id ? { ...i, enabled: !i.enabled } : i));
@@ -206,7 +197,7 @@ export default function ScopeEditorPage() {
   }
 
   // Empty state
-  if (!isDemo && items.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col items-center justify-center bg-[#FAFBFC] px-6 shadow-xl">
         <ParapetLogo size={48} className="text-[#1E3A5F] mb-6" />
@@ -383,13 +374,18 @@ export default function ScopeEditorPage() {
             </div>
           )}
 
-          {/* View Bid Package */}
-          <Button
-            onClick={() => router.push("/bid-package")}
-            className="w-full h-12 bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#1E3A5F]/20 mb-6"
-          >
-            <FileText size={16} /> View Bid Package <ChevronRight size={16} />
-          </Button>
+          {/* View Bid Package — Phase 2 */}
+          <div className="relative group mb-6">
+            <Button
+              disabled
+              className="w-full h-12 bg-[#1E3A5F]/40 text-white/70 font-semibold text-sm rounded-xl flex items-center justify-center gap-2 cursor-not-allowed"
+            >
+              <FileText size={16} /> View Bid Package <ChevronRight size={16} />
+            </Button>
+            <div className="absolute -top-9 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-[#1E3A5F] text-white text-[11px] rounded-lg px-3 py-1.5 whitespace-nowrap pointer-events-none">
+              Coming in Bidding Pro
+            </div>
+          </div>
 
           {/* Provenance */}
           {(provenance.source || provenance.sources) && (
