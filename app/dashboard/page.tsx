@@ -75,6 +75,7 @@ export default function DashboardPage() {
         }
 
         // Fetch walkthroughs to find spatial_id
+        let foundSpatialId: string | null = null;
         try {
           const wtRes = await fetch(`${API_URL}/v1/walkthrough`, {
             headers: getAuthHeaders(),
@@ -84,10 +85,20 @@ export default function DashboardPage() {
             const wtList: any[] = Array.isArray(wts) ? wts : [];
             const withSpatial = wtList.find((w: any) => w.spatial_id);
             if (withSpatial?.spatial_id) {
-              setLatestSpatialId(withSpatial.spatial_id);
+              foundSpatialId = withSpatial.spatial_id;
             }
           }
         } catch { /* spatial lookup optional */ }
+
+        // Fallback: check localStorage for spatial_id from direct upload
+        if (!foundSpatialId) {
+          try {
+            const stored = localStorage.getItem("parapet_spatial_id");
+            if (stored) foundSpatialId = stored;
+          } catch { /* localStorage unavailable */ }
+        }
+
+        if (foundSpatialId) setLatestSpatialId(foundSpatialId);
       } catch { /* silently fail */ }
       finally { setLoading(false); }
     }

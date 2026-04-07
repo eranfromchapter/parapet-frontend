@@ -228,6 +228,7 @@ export default function SpaceCapturePage() {
         } else {
           setSpatialId(sid);
           setRooms(parsedRooms);
+          try { localStorage.setItem("parapet_spatial_id", sid); } catch {}
           setToast(`LiDAR scan uploaded \u2014 ${parsedRooms.length} room${parsedRooms.length > 1 ? "s" : ""} detected!`);
         }
       } else if (["mp4", "mov", "webm"].includes(ext)) {
