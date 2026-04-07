@@ -50,6 +50,7 @@ export default function DesignVisionPage() {
         if (!res.ok) throw new Error(`Failed to load spatial data (${res.status})`);
         const data = await res.json();
         const rawRooms: any[] = data.rooms ?? [];
+        console.log("Spatial rooms:", JSON.stringify(rawRooms));
         if (rawRooms.length === 0) {
           setRoomsError("no_rooms");
           setRoomsLoading(false);
