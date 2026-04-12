@@ -145,11 +145,14 @@ function ResultsContent() {
               <section>
                 <h3 className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase mb-2">Key Materials</h3>
                 <div className="flex flex-wrap gap-2">
-                  {concept.key_materials.map((mat: string, i: number) => (
-                    <span key={i} className="px-3 py-1.5 rounded-full bg-white border border-border/60 text-xs font-medium text-foreground">
-                      {mat}
-                    </span>
-                  ))}
+                  {concept.key_materials.map((mat: string, i: number) => {
+                    const shortName = mat.includes(":") ? mat.split(":")[0].trim() : mat.slice(0, 30);
+                    return (
+                      <span key={i} className="px-3 py-1.5 rounded-full bg-white border border-border/60 text-xs font-medium text-foreground">
+                        {shortName}
+                      </span>
+                    );
+                  })}
                 </div>
               </section>
             )}
@@ -177,11 +180,15 @@ function ResultsContent() {
                     Estimated Budget Impact
                   </h3>
                   <p className="text-lg font-bold text-foreground">
-                    {typeof concept.estimated_budget_impact === "string"
-                      ? concept.estimated_budget_impact
-                      : concept.estimated_budget_impact.min != null
-                        ? `$${concept.estimated_budget_impact.min.toLocaleString()} \u2013 $${concept.estimated_budget_impact.max.toLocaleString()}`
-                        : "\u2014"}
+                    {(() => {
+                      const b = concept.estimated_budget_impact;
+                      if (typeof b === "string") return b;
+                      const lo = b.min ?? b.low;
+                      const hi = b.max ?? b.high;
+                      if (lo != null && hi != null) return `$${lo.toLocaleString()} \u2013 $${hi.toLocaleString()}`;
+                      if (lo != null) return `$${lo.toLocaleString()}+`;
+                      return "Contact for estimate";
+                    })()}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">Based on your room dimensions and material selections</p>
                 </div>
