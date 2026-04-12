@@ -209,7 +209,7 @@ function ReportContent() {
         )}
 
         {/* Total Budget Estimate */}
-        {(budget.range || budget.min != null || budget.total) && (
+        {(budget.range || budget.min != null || budget.low != null || budget.total) && (
           <section>
             <div className="bg-white rounded-xl border border-border/60 p-4 border-l-4 border-l-[#F59E0B]">
               <div className="flex items-center gap-2 mb-2">
@@ -217,13 +217,15 @@ function ReportContent() {
                 <h3 className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">Total Budget Estimate</h3>
               </div>
               <p className="text-xl font-bold text-[#2BCBBA]">
-                {typeof budget === "string"
-                  ? budget
-                  : budget.range
-                    ? budget.range
-                    : budget.min != null
-                      ? `$${budget.min.toLocaleString()} \u2013 $${budget.max.toLocaleString()}`
-                      : `$${(budget.total ?? 0).toLocaleString()}`}
+                {(() => {
+                  if (typeof budget === "string") return budget;
+                  if (budget.range) return budget.range;
+                  const lo = budget.min ?? budget.low;
+                  const hi = budget.max ?? budget.high;
+                  if (lo != null && hi != null) return `$${lo.toLocaleString()} \u2013 $${hi.toLocaleString()}`;
+                  if (budget.total != null) return `$${budget.total.toLocaleString()}`;
+                  return "Contact for estimate";
+                })()}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 Based on your room dimensions, material selections, and current market rates in your area. Labor and installation costs included.
