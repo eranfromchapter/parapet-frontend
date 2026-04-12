@@ -106,15 +106,21 @@ function ResultsContent() {
 
             {/* Render grid */}
             <div className="grid grid-cols-2 gap-2">
-              {[1, 2, 3, 4].map(n => {
+              {[0, 1, 2, 3].map(idx => {
+                const renderUrl: string | undefined = concept.render_urls?.[idx];
                 const palette: string[] = concept.palette ?? ["#1E3A5F", "#2BCBBA", "#F0F4F8", "#E8ECF1"];
-                const bg = `linear-gradient(135deg, ${palette[0] || "#1E3A5F"}, ${palette[Math.min(n, palette.length - 1)] || "#2BCBBA"})`;
+                const bg = `linear-gradient(135deg, ${palette[0] || "#1E3A5F"}, ${palette[Math.min(idx + 1, palette.length - 1)] || "#2BCBBA"})`;
                 return (
-                  <div key={n} className="aspect-square rounded-xl overflow-hidden relative" style={{ background: bg }}>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <Camera size={20} className="text-white/60 mb-1" />
-                      <span className="text-[10px] text-white/60 font-medium">AI Render {n}</span>
-                    </div>
+                  <div key={idx} className="aspect-square rounded-xl overflow-hidden relative" style={renderUrl ? undefined : { background: bg }}>
+                    {renderUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={renderUrl} alt={`${concept.name} render ${idx + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <Camera size={20} className="text-white/60 mb-1" />
+                        <span className="text-[10px] text-white/60 font-medium">AI Render {idx + 1}</span>
+                      </div>
+                    )}
                     <div className="absolute bottom-2 left-2">
                       <span className="text-[9px] bg-black/30 text-white px-2 py-0.5 rounded-full backdrop-blur-sm">
                         {concept.sub_style || concept.name}
