@@ -210,10 +210,12 @@ export default function DesignNewPage() {
     setGenerating(true);
     try {
       const room = rooms[selectedRoom];
+      const spatialId = (() => { try { return localStorage.getItem("parapet_spatial_id"); } catch { return null; } })();
       const res = await fetch(`${API_URL}/v1/design/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({
+          project_id: spatialId || "default",
           room_type: room.name,
           room_data: {
             floor_area_sqft: room.sqft,

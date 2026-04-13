@@ -45,27 +45,37 @@ export default function DesignHubPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadSessions() {
-      const spatialId = (() => { try { return localStorage.getItem("parapet_spatial_id"); } catch { return null; } })();
-      if (!spatialId) {
-        // No project yet — show empty state so user can create
-        setLoading(false);
-        return;
-      }
+    async function fetchSessions(projectId: string): Promise<{ list: DesignSession[]; max?: number } | null> {
       try {
-        const res = await fetch(`${API_URL}/v1/design/sessions/${spatialId}`, {
+        const res = await fetch(`${API_URL}/v1/design/sessions/${projectId}`, {
           headers: getAuthHeaders(),
         });
-        if (res.status === 404) {
-          // No sessions endpoint or no sessions — treat as empty
-          setLoading(false);
-          return;
-        }
+        if (res.status === 404) return null;
         if (!res.ok) throw new Error(`Failed to load designs (${res.status})`);
         const data = await res.json();
         const list: DesignSession[] = data.sessions ?? data.items ?? (Array.isArray(data) ? data : []);
-        setSessions(list);
-        if (data.max_allowed != null) setMaxAllowed(data.max_allowed);
+        return { list, max: data.max_allowed };
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    async function loadSessions() {
+      const spatialId = (() => { try { return localStorage.getItem("parapet_spatial_id"); } catch { return null; } })();
+      try {
+        // Try spatial ID first, then "default" as fallback
+        let result: { list: DesignSession[]; max?: number } | null = null;
+        if (spatialId) {
+          result = await fetchSessions(spatialId);
+        }
+        if (!result || result.list.length === 0) {
+          const fallback = await fetchSessions("default");
+          if (fallback && fallback.list.length > 0) result = fallback;
+        }
+        if (result) {
+          setSessions(result.list);
+          if (result.max != null) setMaxAllowed(result.max);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load designs");
       } finally {
