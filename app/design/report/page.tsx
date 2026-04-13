@@ -77,7 +77,7 @@ function ReportContent() {
     <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-[#FAFBFC] relative shadow-xl">
       <PageHeader title="Design Report" subtitle="Your Design Journey with PARAPET" backPath={`/design/results?session=${sessionId}`} />
 
-      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-4 space-y-5">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-4 pb-4 space-y-5">
 
         {/* Room Analysis */}
         <section className="bg-white rounded-xl border border-border/60 p-4">
@@ -92,9 +92,9 @@ function ReportContent() {
               ["Floor Area", room.floor_area_sqft ? `${room.floor_area_sqft} sq ft` : null],
               ["Features", room.features],
             ].map(([label, value]) => value ? (
-              <div key={label as string} className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{label}</span>
-                <span className="text-xs font-medium text-foreground">{value}</span>
+              <div key={label as string} className="flex items-start justify-between gap-3">
+                <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+                <span className="text-xs font-medium text-foreground text-right break-words min-w-0">{value}</span>
               </div>
             ) : null)}
           </div>
@@ -154,11 +154,11 @@ function ReportContent() {
             </div>
             <div className="space-y-3">
               {materials.map((mat: any, i: number) => (
-                <div key={i} className="bg-white rounded-xl border border-border/60 p-4">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-semibold text-foreground">{mat.category || mat.name}</p>
+                <div key={i} className="bg-white rounded-xl border border-border/60 p-4 overflow-hidden">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <p className="text-sm font-semibold text-foreground min-w-0 break-words">{mat.category || mat.name}</p>
                     {mat.cost_range && (
-                      <p className="text-sm font-semibold text-foreground">
+                      <p className="text-sm font-semibold text-foreground shrink-0">
                         {typeof mat.cost_range === "string"
                           ? mat.cost_range
                           : `$${(mat.cost_range.low ?? 0).toLocaleString()}\u2013$${(mat.cost_range.high ?? 0).toLocaleString()}`}
@@ -166,17 +166,17 @@ function ReportContent() {
                     )}
                   </div>
                   {mat.description && (
-                    <p className="text-xs text-muted-foreground mb-2">{mat.description}</p>
+                    <p className="text-xs text-muted-foreground mb-2 break-words">{mat.description}</p>
                   )}
                   <div className="flex flex-wrap gap-2">
                     {mat.durability && (
-                      <span className="flex items-center gap-1 text-[10px] font-medium text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded-full">
-                        <Shield size={10} /> Durability: {mat.durability}
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded-full">
+                        <Shield size={10} className="shrink-0" /> Durability: {mat.durability}
                       </span>
                     )}
                     {mat.maintenance && (
-                      <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
-                        <Wrench size={10} /> Maintenance: {typeof mat.maintenance === "string" ? mat.maintenance : mat.maintenance.level || mat.maintenance}
+                      <span className="inline-flex items-start gap-1 text-[10px] font-medium text-muted-foreground bg-muted/50 px-2 py-1 rounded-lg break-words">
+                        <Wrench size={10} className="shrink-0 mt-0.5" /> Maintenance: {typeof mat.maintenance === "string" ? mat.maintenance : mat.maintenance.level || mat.maintenance}
                       </span>
                     )}
                   </div>
@@ -219,7 +219,7 @@ function ReportContent() {
         {/* Total Budget Estimate */}
         {(budget.range || budget.min != null || budget.low != null || budget.total) && (
           <section>
-            <div className="bg-white rounded-xl border border-border/60 p-4 border-l-4 border-l-[#F59E0B]">
+            <div className="bg-white rounded-xl border border-border/60 p-4 border-l-4 border-l-[#F59E0B] overflow-hidden">
               <div className="flex items-center gap-2 mb-2">
                 <DollarSign size={16} className="text-[#1E3A5F]" />
                 <h3 className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">Total Budget Estimate</h3>
@@ -251,15 +251,13 @@ function ReportContent() {
             </div>
             <div className="space-y-2">
               {maintenance.map((m: any, i: number) => (
-                <div key={i} className="bg-white rounded-xl border border-border/60 p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-semibold text-foreground">{m.item || m.name}</p>
-                    {m.frequency && (
-                      <span className="text-[10px] font-medium bg-[#F0F4F8] text-muted-foreground px-2.5 py-0.5 rounded-full shrink-0 ml-2">{m.frequency}</span>
-                    )}
-                  </div>
+                <div key={i} className="bg-white rounded-xl border border-border/60 p-3 overflow-hidden">
+                  <p className="text-sm font-semibold text-foreground break-words mb-1">{m.item || m.name}</p>
+                  {m.frequency && (
+                    <p className="text-[10px] font-medium bg-[#F0F4F8] text-muted-foreground px-2.5 py-1 rounded-lg mb-2 break-words">{m.frequency}</p>
+                  )}
                   {(m.task || m.description) && (
-                    <p className="text-xs text-muted-foreground">{m.task || m.description}</p>
+                    <p className="text-xs text-muted-foreground break-words">{m.task || m.description}</p>
                   )}
                 </div>
               ))}
