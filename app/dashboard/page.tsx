@@ -7,7 +7,7 @@ import BottomNav from "@/components/BottomNav";
 import { getAuthHeaders } from "@/lib/auth";
 import {
   Bell, Plus, ArrowRight, Camera, FileText, BarChart3,
-  Users, AlertTriangle, Scan, PenTool, Palette, Scale,
+  AlertTriangle, Scan, PenTool, Palette, Scale,
   Shield, Gavel, FileCheck, MapPin, DollarSign,
   CalendarRange, Hammer, Bug, FolderArchive, Package,
   ChevronRight, User,
@@ -238,7 +238,7 @@ export default function DashboardPage() {
             { label: "Create an Estimate", href: "/capture", icon: Camera, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
             { label: "Readiness Report", href: hasReport ? `/readiness/${reportId}` : "/intake/home-type", icon: FileText, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
             { label: "View Estimate", href: latestSpatialId ? `/scope/${latestSpatialId}` : "/capture", icon: BarChart3, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
-            { label: "Contractors", href: "#", icon: Users, color: "bg-amber-100", iconColor: "text-amber-600" },
+            { label: "My Documents", href: "/documents", icon: FolderArchive, color: "bg-[#2BCBBA]/15", iconColor: "text-[#2BCBBA]" },
           ].map((action) => (
             <Link key={action.label} href={action.href} className="flex flex-col items-center gap-1.5">
               <div className={`w-12 h-12 rounded-full ${action.color} flex items-center justify-center`}>
