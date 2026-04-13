@@ -251,13 +251,13 @@ function ReportContent() {
             </div>
             <div className="space-y-2">
               {maintenance.map((m: any, i: number) => (
-                <div key={i} className="bg-white rounded-xl border border-border/60 p-3 overflow-hidden">
-                  <p className="text-sm font-semibold text-foreground break-words mb-1">{m.item || m.name}</p>
+                <div key={i} className="bg-white rounded-xl border border-border/60 p-3 overflow-hidden flex flex-col">
+                  <p className="text-sm font-semibold text-foreground mb-1">{m.item || m.name}</p>
                   {m.frequency && (
-                    <p className="text-[10px] font-medium bg-[#F0F4F8] text-muted-foreground px-2.5 py-1 rounded-lg mb-2 break-words">{m.frequency}</p>
+                    <p className="text-xs text-muted-foreground mb-2 italic">{m.frequency}</p>
                   )}
                   {(m.task || m.description) && (
-                    <p className="text-xs text-muted-foreground break-words">{m.task || m.description}</p>
+                    <p className="text-xs text-muted-foreground">{m.task || m.description}</p>
                   )}
                 </div>
               ))}

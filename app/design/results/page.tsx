@@ -152,7 +152,14 @@ function ResultsContent() {
                 <h3 className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase mb-2">Key Materials</h3>
                 <div className="flex flex-wrap gap-2">
                   {concept.key_materials.map((mat: string, i: number) => {
-                    const shortName = mat.includes(":") ? mat.split(":")[0].trim() : mat.slice(0, 30);
+                    let shortName: string;
+                    if (mat.includes(":")) {
+                      shortName = mat.split(":")[0].trim();
+                    } else if (mat.includes("(")) {
+                      shortName = mat.split("(")[0].trim().replace(/,\s*$/, "");
+                    } else {
+                      shortName = mat.length > 40 ? mat.slice(0, 37) + "\u2026" : mat;
+                    }
                     return (
                       <span key={i} className="px-3 py-1.5 rounded-full bg-white border border-border/60 text-xs font-medium text-foreground">
                         {shortName}
