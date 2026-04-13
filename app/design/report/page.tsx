@@ -20,24 +20,26 @@ function ReportContent() {
   const sessionId = searchParams.get("session");
   const conceptIndex = searchParams.get("concept") || "0";
 
-  const [report, setReport] = useState<any>(null);
+  const [conceptData, setConceptData] = useState<any>(null);
+  const [sessionData, setSessionData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState("");
 
-  const fetchReport = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     if (!sessionId) return;
     try {
-      const res = await fetch(`${API_URL}/v1/design/${sessionId}/concept/${conceptIndex}`, {
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) throw new Error(`${res.status}`);
-      setReport(await res.json());
+      const [conceptRes, sessionRes] = await Promise.all([
+        fetch(`${API_URL}/v1/design/${sessionId}/concept/${conceptIndex}`, { headers: getAuthHeaders() }),
+        fetch(`${API_URL}/v1/design/${sessionId}`, { headers: getAuthHeaders() }),
+      ]);
+      if (conceptRes.ok) setConceptData(await conceptRes.json());
+      if (sessionRes.ok) setSessionData(await sessionRes.json());
     } catch { /* silently fail */ }
     finally { setLoading(false); }
   }, [sessionId, conceptIndex]);
 
-  useEffect(() => { fetchReport(); }, [fetchReport]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   if (loading) {
     return (
@@ -47,7 +49,7 @@ function ReportContent() {
     );
   }
 
-  if (!report) {
+  if (!conceptData) {
     return (
       <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-[#FAFBFC] relative shadow-xl">
         <PageHeader title="Design Report" backPath={`/design/results?session=${sessionId}`} />
@@ -59,15 +61,17 @@ function ReportContent() {
     );
   }
 
-  const room = report.room_analysis ?? {};
-  const vision = report.vision_text ?? report.your_vision ?? "";
-  const keywords: string[] = report.style_keywords ?? [];
-  const inspirationLinks: string[] = report.inspiration_links ?? [];
-  const materials: any[] = report.material_recommendations ?? [];
-  const lighting = report.lighting_simulation ?? {};
-  const budget = report.total_budget_estimate ?? report.budget_estimate ?? {};
-  const maintenance: any[] = report.maintenance_advisory ?? [];
-  const whyDesign = report.why_this_design ?? "";
+  // API nests report fields under conceptData.report
+  const rpt = conceptData.report ?? {};
+  const room = sessionData?.room_analysis ?? {};
+  const vision = rpt.vision_echo ?? "";
+  const keywords: string[] = rpt.style_keywords ?? [];
+  const inspirationLinks: string[] = rpt.inspiration_links ?? [];
+  const materials: any[] = rpt.material_recommendations ?? [];
+  const lighting = rpt.lighting_simulation ?? {};
+  const budget = rpt.total_budget_estimate ?? conceptData.concept?.estimated_budget_impact ?? {};
+  const maintenance: any[] = rpt.maintenance_advisory ?? [];
+  const whyDesign = rpt.why_this_design ?? "";
 
   return (
     <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-[#FAFBFC] relative shadow-xl">
@@ -153,8 +157,12 @@ function ReportContent() {
                 <div key={i} className="bg-white rounded-xl border border-border/60 p-4">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-sm font-semibold text-foreground">{mat.category || mat.name}</p>
-                    {(mat.price_range || mat.cost_range) && (
-                      <p className="text-sm font-semibold text-foreground">{mat.price_range || mat.cost_range}</p>
+                    {mat.cost_range && (
+                      <p className="text-sm font-semibold text-foreground">
+                        {typeof mat.cost_range === "string"
+                          ? mat.cost_range
+                          : `$${(mat.cost_range.low ?? 0).toLocaleString()}\u2013$${(mat.cost_range.high ?? 0).toLocaleString()}`}
+                      </p>
                     )}
                   </div>
                   {mat.description && (
@@ -242,16 +250,16 @@ function ReportContent() {
               <h3 className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">Maintenance Advisory</h3>
             </div>
             <div className="space-y-2">
-              {maintenance.map((item: any, i: number) => (
+              {maintenance.map((m: any, i: number) => (
                 <div key={i} className="bg-white rounded-xl border border-border/60 p-3">
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-semibold text-foreground">{item.name || item.item}</p>
-                    {item.frequency && (
-                      <span className="text-[10px] font-medium bg-[#F0F4F8] text-muted-foreground px-2.5 py-0.5 rounded-full">{item.frequency}</span>
+                    <p className="text-sm font-semibold text-foreground">{m.item || m.name}</p>
+                    {m.frequency && (
+                      <span className="text-[10px] font-medium bg-[#F0F4F8] text-muted-foreground px-2.5 py-0.5 rounded-full shrink-0 ml-2">{m.frequency}</span>
                     )}
                   </div>
-                  {item.description && (
-                    <p className="text-xs text-muted-foreground">{item.description}</p>
+                  {(m.task || m.description) && (
+                    <p className="text-xs text-muted-foreground">{m.task || m.description}</p>
                   )}
                 </div>
               ))}
