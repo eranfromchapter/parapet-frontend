@@ -242,6 +242,14 @@ export default function DesignNewPage() {
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
       const data = await res.json();
       const sessionId = data.session_id || data.id;
+      try {
+        localStorage.setItem("parapet_design_summary", JSON.stringify({
+          reference_images: photos.length,
+          inspiration_links: links.length > 0,
+          style_keywords: selectedKeywords.length,
+          vision_text: visionText.trim().length > 0,
+        }));
+      } catch {}
       router.push(`/design/generating?session=${sessionId}`);
     } catch {
       showToast("Failed to generate design. Please try again.");

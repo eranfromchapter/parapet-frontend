@@ -47,6 +47,7 @@ function GeneratingContent() {
       if (data.status === "complete" || data.status === "completed") {
         setStatus("complete");
         setCurrentStep(STEPS.length);
+        try { localStorage.removeItem("parapet_design_summary"); } catch {}
         return;
       }
 
@@ -76,6 +77,12 @@ function GeneratingContent() {
     return () => clearInterval(timer);
   }, [status]);
 
+  // Read locally-stored summary from creation form, fall back to API data
+  const [localSummary] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("parapet_design_summary") || "null");
+    } catch { return null; }
+  });
   const summaryItems = sessionData?.style_preferences;
 
   if (status === "complete") {
@@ -144,14 +151,14 @@ function GeneratingContent() {
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <ImageIcon size={14} /> Reference Images
             </div>
-            <span className="text-xs font-medium text-foreground">{summaryItems?.reference_image_count ?? 0}</span>
+            <span className="text-xs font-medium text-foreground">{localSummary?.reference_images ?? summaryItems?.reference_image_count ?? 0}</span>
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Link2 size={14} /> Inspiration Links
             </div>
             <span className="text-xs font-medium text-foreground">
-              {(summaryItems?.inspiration_links?.length ?? 0) > 0 ? "Added" : "None"}
+              {(localSummary?.inspiration_links || (summaryItems?.inspiration_links?.length ?? 0) > 0) ? "Added" : "None"}
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -159,7 +166,7 @@ function GeneratingContent() {
               <Tag size={14} /> Style Keywords
             </div>
             <span className="text-xs font-medium text-foreground">
-              {summaryItems?.keywords?.length ?? 0} selected
+              {localSummary?.style_keywords ?? summaryItems?.keywords?.length ?? 0} selected
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -167,7 +174,7 @@ function GeneratingContent() {
               <MessageSquare size={14} /> Custom Vision
             </div>
             <span className="text-xs font-medium text-foreground">
-              {summaryItems?.vision_text ? "Added" : "None"}
+              {(localSummary?.vision_text || summaryItems?.vision_text) ? "Added" : "None"}
             </span>
           </div>
         </div>
