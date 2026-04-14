@@ -257,7 +257,6 @@ export default function ReadinessReportPage() {
   // ── Extract from report.report_json ──
   const rj = report?.report_json ?? {};
   const formData = report?.form_data ?? report?.intake_data ?? {};
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
 
   // Cost
   const costEst = rj?.cost_estimate ?? {};
