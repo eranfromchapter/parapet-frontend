@@ -188,6 +188,18 @@ export default function WelcomePage() {
           </p>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-border/30 py-5 px-6">
+        <div className="max-w-3xl mx-auto flex flex-col items-center gap-2">
+          <div className="flex items-center gap-4 text-[12px] text-muted-foreground">
+            <Link href="/terms" className="hover:text-[#1E3A5F] transition-colors">Terms of Service</Link>
+            <span className="text-border">|</span>
+            <Link href="/privacy" className="hover:text-[#1E3A5F] transition-colors">Privacy Policy</Link>
+          </div>
+          <p className="text-[11px] text-muted-foreground/60">&copy; 2026 New Parapet LLC</p>
+        </div>
+      </footer>
     </div>
   );
 }

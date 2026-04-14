@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
+import Link from "next/link";
 import {
   ChevronLeft, ChevronRight, Pencil, Check,
   Mail, Phone, MapPin,
@@ -546,7 +547,6 @@ export default function AccountPage() {
             {([
               { label: "Change Password", icon: KeyRound },
               { label: "Security & Privacy", icon: Shield },
-              { label: "Terms of Service", icon: FileText },
               { label: "Help & Support", icon: HelpCircle },
             ]).map(({ label, icon: Icon }) => (
               <button
@@ -559,6 +559,22 @@ export default function AccountPage() {
                 <ChevronRight size={16} className="text-[#64748B]" />
               </button>
             ))}
+            <Link
+              href="/terms"
+              className="flex items-center gap-3 px-4 py-3.5 w-full hover:bg-gray-50 transition-colors"
+            >
+              <FileText size={18} className="text-[#64748B] flex-shrink-0" />
+              <span className="flex-1 text-[14px] text-[#1E3A5F] font-medium">Terms of Service</span>
+              <ChevronRight size={16} className="text-[#64748B]" />
+            </Link>
+            <Link
+              href="/privacy"
+              className="flex items-center gap-3 px-4 py-3.5 w-full hover:bg-gray-50 transition-colors"
+            >
+              <Shield size={18} className="text-[#64748B] flex-shrink-0" />
+              <span className="flex-1 text-[14px] text-[#1E3A5F] font-medium">Privacy Policy</span>
+              <ChevronRight size={16} className="text-[#64748B]" />
+            </Link>
           </div>
         </section>
 

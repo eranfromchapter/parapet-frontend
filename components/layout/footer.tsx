@@ -18,14 +18,14 @@ export function Footer() {
           </div>
 
           <div className="flex gap-8 text-sm text-slate-500">
-            <Link href="#" className="hover:text-navy transition-colors">Privacy Policy</Link>
-            <Link href="#" className="hover:text-navy transition-colors">Terms of Service</Link>
+            <Link href="/privacy" className="hover:text-navy transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-navy transition-colors">Terms of Service</Link>
             <Link href="#" className="hover:text-navy transition-colors">Contact</Link>
           </div>
         </div>
 
         <div className="mt-8 pt-8 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-slate-400">
-          <p>&copy; 2026 Hello Chapter / HAP Construction</p>
+          <p>&copy; 2026 New Parapet LLC</p>
           <p>Patent Pending</p>
         </div>
       </div>
