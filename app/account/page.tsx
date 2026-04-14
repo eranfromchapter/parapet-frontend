@@ -121,7 +121,6 @@ export default function AccountPage() {
   // Edit form state
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
-  const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editStreet, setEditStreet] = useState("");
   const [editUnit, setEditUnit] = useState("");
@@ -152,7 +151,6 @@ export default function AccountPage() {
     if (!profile) return;
     setEditFirstName(profile.first_name || "");
     setEditLastName(profile.last_name || "");
-    setEditEmail(profile.email || "");
     setEditPhone(profile.phone || "");
     setEditStreet(profile.address?.street || "");
     setEditUnit(profile.address?.unit || "");
@@ -168,7 +166,6 @@ export default function AccountPage() {
       const data = await updateProfile({
         first_name: editFirstName || null,
         last_name: editLastName || null,
-        email: editEmail || null,
         phone: editPhone || null,
         address: {
           street: editStreet || null,
@@ -295,13 +292,21 @@ export default function AccountPage() {
                 <Pencil size={12} /> Edit
               </button>
             ) : (
-              <button
-                onClick={saveProfile}
-                disabled={saving}
-                className="flex items-center gap-1 text-[12px] font-medium text-[#1E3A5F]"
-              >
-                <Check size={12} /> {saving ? "Saving..." : "Save"}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setEditing(false)}
+                  className="text-[12px] font-medium text-[#64748B] hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveProfile}
+                  disabled={saving}
+                  className="flex items-center gap-1 text-[12px] font-medium text-white bg-[#2BCBBA] hover:bg-[#24b5a5] px-3 py-1 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <Check size={12} /> {saving ? "Saving..." : "Save"}
+                </button>
+              </div>
             )}
           </div>
 
@@ -345,17 +350,7 @@ export default function AccountPage() {
               <Mail size={16} className="text-[#64748B] flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-[#64748B] uppercase mb-0.5">Email</p>
-                {editing ? (
-                  <input
-                    type="email"
-                    value={editEmail}
-                    onChange={(e) => setEditEmail(e.target.value)}
-                    placeholder="email@example.com"
-                    className="w-full text-[14px] text-[#1E3A5F] font-medium bg-transparent border-b border-[#1E3A5F]/30 outline-none focus:border-[#1E3A5F] pb-0.5"
-                  />
-                ) : (
-                  <p className="text-[14px] text-[#1E3A5F] font-medium truncate">{profile.email || "—"}</p>
-                )}
+                <p className="text-[14px] text-[#1E3A5F] font-medium truncate">{profile.email || "—"}</p>
               </div>
             </div>
             <div className="border-b border-[#F1F5F9]" />
