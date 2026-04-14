@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import {
   TrendingUp, Clock, DollarSign, AlertTriangle, CheckCircle2,
   Info, Download, ArrowRight, Target, Shield, ChevronLeft,
-  FileText, Users, ListChecks, AlertCircle,
+  FileText, Users, ListChecks, AlertCircle, Loader2,
 } from "lucide-react";
 import ParapetLogo from "@/components/ParapetLogo";
 import BottomNav from "@/components/BottomNav";
 import { getAuthHeaders } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -84,14 +85,41 @@ function dimBarColor(score: number): string {
 export default function ReadinessReportPage() {
   const params = useParams();
   const router = useRouter();
+  const { toast } = useToast();
   const reportId = params.id as string;
 
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const pollStartRef = useRef<number>(0);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
+      const res = await fetch(`${apiBase}/v1/readiness-reports/${reportId}/pdf`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition");
+      const filenameMatch = disposition?.match(/filename="?([^";\n]+)"?/);
+      const filename = filenameMatch?.[1] || `PARAPET_Readiness_Report_${reportId}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "PDF download failed", description: "Please try again in a moment.", variant: "destructive" });
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   const fetchReport = useCallback(async () => {
     try {
@@ -305,11 +333,10 @@ export default function ReadinessReportPage() {
               <p className="text-[10px] text-muted-foreground mt-0.5">{projectLabel} {'\u2014'} Feasibility Analysis</p>
             </div>
           </div>
-          <a href={`${apiUrl}/v1/readiness-reports/${reportId}/html`} target="_blank" rel="noopener noreferrer">
-            <Button variant="ghost" size="sm" className="text-xs gap-1.5">
-              <Download size={14} /> PDF
-            </Button>
-          </a>
+          <Button variant="ghost" size="sm" className="text-xs gap-1.5" onClick={handleDownloadPdf} disabled={downloadingPdf}>
+            {downloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            {downloadingPdf ? "Downloading..." : "PDF"}
+          </Button>
         </div>
       </header>
 
