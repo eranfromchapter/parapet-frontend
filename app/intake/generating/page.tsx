@@ -14,7 +14,10 @@ const ANALYSIS_STEPS = [
 ];
 
 const TOTAL_DURATION = ANALYSIS_STEPS.reduce((sum, s) => sum + s.duration, 0);
-const HARD_TIMEOUT_MS = 180_000; // 180 seconds
+// Azure OpenAI + LangGraph pipeline empirically takes 2–4 min in prod (sometimes longer).
+// Previous 180s timeout fired BEFORE the backend finished — that was the real "Taking longer than expected" bug.
+// 8 min gives generous headroom; the user can safely close the page — the report still gets emailed.
+const HARD_TIMEOUT_MS = 480_000; // 8 minutes
 
 function GeneratingContent() {
   const router = useRouter();
@@ -85,19 +88,32 @@ function GeneratingContent() {
         status === "success" || status === "done" || status === "ready" ||
         hasReport;
 
+      console.log("[generating] poll", {
+        reportId,
+        status,
+        hasReport,
+        progress_pct: data?.progress_pct,
+        elapsedSec: Math.round(totalElapsed / 1000),
+      });
+
       if (isDone) {
+        console.log("[generating] completion detected → navigating to /readiness/" + reportId);
         redirected.current = true;
         router.replace(`/readiness/${reportId}`);
         return;
       }
       if (status === "failed" || status === "error") {
+        console.warn("[generating] pipeline reported failure", data);
         setErrorState("failed");
         return;
       }
       // Still processing — keep polling
-    } catch {
+    } catch (err) {
       pollCount.current++;
-      if (pollCount.current >= 30) {
+      console.warn("[generating] poll error", pollCount.current, err);
+      // Only trip the error-count timeout after a long streak of network errors,
+      // and never before the hard timeout — the hard timeout is the source of truth.
+      if (pollCount.current >= 60) {
         setErrorState("timeout");
       }
     }
