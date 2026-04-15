@@ -13,7 +13,8 @@ import { getAuthHeaders } from "@/lib/auth";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
+// Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
+const API_URL = "/api/backend";
 
 const fmt = (n: number) => `$${n.toLocaleString()}`;
 

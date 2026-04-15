@@ -6,7 +6,8 @@ import ParapetLogo from "@/components/ParapetLogo";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Mail } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
+// Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
+const API_URL = "/api/backend";
 
 export default function LoginPage() {
   const router = useRouter();

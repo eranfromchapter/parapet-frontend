@@ -1,10 +1,15 @@
 import { getAuthHeaders } from './auth';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL;
-
-if (!API_BASE) {
-  throw new Error('NEXT_PUBLIC_API_URL environment variable is required');
-}
+// Base URL for all backend API calls. Routed through the same-origin Vercel
+// proxy defined in next.config.mjs (rewrite: /api/backend/* → Railway).
+//
+// Why: the Railway backend's CORS preflight returns HTTP 400. Chrome is lenient
+// and accepts this, but Safari strictly requires 2xx and rejects the preflight,
+// causing every direct cross-origin fetch to fail with "Load failed".
+// Sending all client-side API calls through the same-origin proxy eliminates
+// CORS entirely — the browser never issues a preflight, so the backend's
+// OPTIONS handler never gets a chance to break things.
+const API_BASE = "/api/backend";
 
 interface FetchOptions extends RequestInit {
   timeout?: number;

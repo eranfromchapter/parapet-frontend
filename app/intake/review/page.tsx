@@ -75,7 +75,8 @@ export default function IntakeReview() {
     setError(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
+      // Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
+      const apiUrl = "/api/backend";
       const body = mapFormToBackend(formData);
 
       const res = await fetch(`${apiUrl}/v1/readiness-reports`, {

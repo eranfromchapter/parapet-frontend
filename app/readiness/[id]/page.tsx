@@ -99,7 +99,8 @@ export default function ReadinessReportPage() {
   const handleDownloadPdf = async () => {
     setDownloadingPdf(true);
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
+      // Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
+      const apiBase = "/api/backend";
       const res = await fetch(`${apiBase}/v1/readiness-reports/${reportId}/pdf`, {
         headers: getAuthHeaders(),
       });
@@ -123,7 +124,8 @@ export default function ReadinessReportPage() {
 
   const fetchReport = useCallback(async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
+      // Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
+      const apiUrl = "/api/backend";
       const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}`, {
         headers: getAuthHeaders(),
       });

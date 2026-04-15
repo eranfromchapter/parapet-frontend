@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { User } from "lucide-react";
 import { isAuthenticated, getAuthHeaders } from "@/lib/auth";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
+// Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
+const API_URL = "/api/backend";
 
 export default function LoginButton() {
   const router = useRouter();
