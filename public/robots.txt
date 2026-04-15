@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /intake/
+Disallow: /account
+Disallow: /readiness/
+Disallow: /reports/
+Disallow: /estimate/
+Disallow: /scope/
+Disallow: /design/
+Disallow: /documents
+Disallow: /notifications
+Disallow: /capture
+Disallow: /generating/
+Disallow: /estimate-generating
+
+Sitemap: https://parapet-ai.com/sitemap.xml
