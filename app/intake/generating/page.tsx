@@ -78,10 +78,16 @@ function GeneratingContent() {
 
     try {
       setPollCountState((c) => c + 1);
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
-      // Cache-bust query param + no-store to bypass Railway/Fastly edge cache
-      const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}?t=${Date.now()}`, {
-        headers: { ...getAuthHeaders(), "Cache-Control": "no-cache", Pragma: "no-cache" },
+      // Same-origin proxy (see next.config.mjs rewrites). The browser sees a
+      // same-origin request so CORS never applies; Vercel forwards the request
+      // server-to-server to Railway. This is necessary because the backend's
+      // OPTIONS preflight returns HTTP 400, which Safari strictly rejects with
+      // "Load failed". Simple cross-origin fetch works in Chrome but not Safari.
+      // Cache-busting:
+      //   - `?t=${Date.now()}` query param defeats URL-keyed edge caches
+      //   - `cache: "no-store"` tells the browser's own HTTP cache not to store
+      const res = await fetch(`/api/backend/v1/readiness-reports/${reportId}?t=${Date.now()}`, {
+        headers: { ...getAuthHeaders() },
         cache: "no-store",
       });
       setLastHttpStatus(res.status);
