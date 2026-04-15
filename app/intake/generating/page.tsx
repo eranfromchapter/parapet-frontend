@@ -79,27 +79,43 @@ function GeneratingContent() {
 
       // Broadened completion detection: accept multiple "done" status values or a populated report_json
       const status = String(data?.status ?? "").toLowerCase();
-      const hasReport =
+      const hasReportJson =
         data?.report_json != null &&
         typeof data.report_json === "object" &&
         Object.keys(data.report_json).length > 0;
       const isDone =
         status === "completed" || status === "complete" ||
         status === "success" || status === "done" || status === "ready" ||
-        hasReport;
+        hasReportJson;
 
-      console.log("[generating] poll", {
-        reportId,
+      const elapsedSeconds = Math.round(totalElapsed / 1000);
+      // Per-poll telemetry — exactly the fields requested for debugging
+      console.log("[PARAPET] poll", {
         status,
-        hasReport,
-        progress_pct: data?.progress_pct,
-        elapsedSec: Math.round(totalElapsed / 1000),
+        hasReportJson,
+        elapsedSeconds,
+        progressPct: data?.progress_pct,
       });
 
-      if (isDone) {
-        console.log("[generating] completion detected → navigating to /readiness/" + reportId);
+      // HARD FALLBACK: If we've been polling for over 30 seconds and report_json exists, navigate immediately.
+      // window.location.href is ugly but bypasses the Next.js router entirely — it CANNOT be silently dropped
+      // by stale closures, unmounted components, or suspense boundaries. Reliability > elegance.
+      if (elapsedSeconds > 30 && hasReportJson) {
+        console.log("[PARAPET] HARD FALLBACK: report_json detected, forcing navigation");
         redirected.current = true;
-        router.replace(`/readiness/${reportId}`);
+        window.location.href = `/readiness/${reportId}`;
+        return;
+      }
+
+      if (isDone) {
+        console.log("[PARAPET] completion detected → navigating to /readiness/" + reportId);
+        redirected.current = true;
+        try {
+          router.replace(`/readiness/${reportId}`);
+        } catch (e) {
+          console.error("[PARAPET] router.replace failed, using window.location", e);
+          window.location.href = `/readiness/${reportId}`;
+        }
         return;
       }
       if (status === "failed" || status === "error") {
