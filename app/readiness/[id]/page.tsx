@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   TrendingUp, Clock, DollarSign, AlertTriangle, CheckCircle2,
   Info, Download, ArrowRight, Target, Shield, ChevronLeft,
-  FileText, Users, ListChecks, AlertCircle, Loader2,
+  FileText, Users, ListChecks, AlertCircle, Loader2, Camera,
 } from "lucide-react";
 import ParapetLogo from "@/components/ParapetLogo";
 import BottomNav from "@/components/BottomNav";
@@ -752,6 +752,42 @@ export default function ReadinessReportPage() {
             </div>
           </Card>
         )}
+
+        {/* ── Next Steps Nudge ── */}
+        <Card className="p-4 mb-4 rounded-xl border border-border/50 bg-[#2BCBBA]/[0.06]">
+          <h3 className="text-sm font-bold text-[#1E3A5F] mb-1">Ready for the next step?</h3>
+          <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
+            Your report is a solid first look. Here&apos;s how to turn it into a plan.
+          </p>
+          <div className="space-y-2">
+            <button
+              onClick={() => router.push("/capture")}
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-white border border-border/50 hover:border-[#2BCBBA]/60 hover:shadow-sm transition-all text-left"
+            >
+              <div className="w-9 h-9 rounded-full bg-[#2BCBBA]/15 flex items-center justify-center flex-shrink-0">
+                <Camera size={16} className="text-[#2BCBBA]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-foreground leading-tight">Upload a spatial scan</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">Room-by-room measurements for accurate estimates.</p>
+              </div>
+              <ArrowRight size={14} className="text-[#1E3A5F] flex-shrink-0" />
+            </button>
+            <button
+              onClick={() => router.push("/services")}
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-white border border-border/50 hover:border-[#2BCBBA]/60 hover:shadow-sm transition-all text-left"
+            >
+              <div className="w-9 h-9 rounded-full bg-[#1E3A5F]/10 flex items-center justify-center flex-shrink-0">
+                <FileText size={16} className="text-[#1E3A5F]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-foreground leading-tight">Get your detailed estimate</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">Room-level pricing and specifications with Bidding Pro.</p>
+              </div>
+              <ArrowRight size={14} className="text-[#1E3A5F] flex-shrink-0" />
+            </button>
+          </div>
+        </Card>
 
         {/* ── CTA ── */}
         <Button

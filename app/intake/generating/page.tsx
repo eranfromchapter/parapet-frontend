@@ -6,11 +6,11 @@ import ParapetLogo from "@/components/ParapetLogo";
 import { getAuthHeaders } from "@/lib/auth";
 
 const ANALYSIS_STEPS = [
-  { label: "Analyzing market data", duration: 3500 },
-  { label: "Checking regulatory requirements", duration: 4500 },
+  { label: "Analyzing your project scope", duration: 3500 },
+  { label: "Checking NYC regulations", duration: 4500 },
   { label: "Assessing project risks", duration: 3000 },
-  { label: "Generating cost estimates", duration: 4000 },
-  { label: "Compiling your report", duration: 3000 },
+  { label: "Calculating cost estimates", duration: 4000 },
+  { label: "Generating your Readiness Report", duration: 3000 },
 ];
 
 const TOTAL_DURATION = ANALYSIS_STEPS.reduce((sum, s) => sum + s.duration, 0);

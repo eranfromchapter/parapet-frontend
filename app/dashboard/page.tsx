@@ -10,7 +10,7 @@ import {
   AlertTriangle, Scan, PenTool, Palette, Scale,
   Shield, Gavel, FileCheck, MapPin, DollarSign,
   CalendarRange, Hammer, Bug, FolderArchive, Package,
-  ChevronRight, User,
+  ChevronRight, User, ClipboardList, Lock,
 } from "lucide-react";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -175,19 +175,88 @@ export default function DashboardPage() {
 
       <div className="flex-1 px-4 pt-4 pb-4 safe-bottom overflow-y-auto">
 
-        {/* ── Start New Assessment ── */}
-        <Link href="/intake/home-type">
-          <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-dashed border-[#1E3A5F]/30 mb-4 hover:border-[#1E3A5F]/50 hover:bg-[#1E3A5F]/[0.02] transition-all">
-            <div className="w-10 h-10 rounded-full bg-[#1E3A5F]/10 flex items-center justify-center flex-shrink-0">
-              <Plus size={20} className="text-[#1E3A5F]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground">Start New Assessment</p>
-              <p className="text-[11px] text-muted-foreground">Get your personalized Renovation Readiness Report</p>
-            </div>
-            <ArrowRight size={16} className="text-muted-foreground flex-shrink-0" />
+        {/* ── Onboarding (no report yet) OR Start New Assessment ── */}
+        {!loading && !latestReport ? (
+          <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-[#1E3A5F]/[0.04] to-[#2BCBBA]/[0.05] p-5 mb-5">
+            <h2 className="text-lg font-bold text-[#1E3A5F] leading-tight">Let&apos;s plan your renovation</h2>
+            <p className="text-[12px] text-muted-foreground mt-1 mb-4 leading-relaxed">
+              Complete these steps to get your personalized renovation plan.
+            </p>
+
+            <ol className="space-y-3">
+              {/* Step 1 — available */}
+              <li>
+                <Link
+                  href="/intake/home-type"
+                  className="flex items-start gap-3 p-3 rounded-xl bg-white border border-[#1E3A5F]/20 hover:border-[#1E3A5F]/40 hover:shadow-sm transition-all"
+                >
+                  <div className="w-9 h-9 rounded-full bg-[#1E3A5F] flex items-center justify-center flex-shrink-0">
+                    <ClipboardList size={16} className="text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-[13px] font-semibold text-[#1E3A5F] leading-tight">Tell us about your project</p>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-[#2BCBBA]/15 text-[9px] font-semibold text-[#1E3A5F]">5 min</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                      Answer 7 quick questions about your renovation.
+                    </p>
+                  </div>
+                  <ArrowRight size={14} className="text-[#1E3A5F] flex-shrink-0 mt-2" />
+                </Link>
+              </li>
+
+              {/* Step 2 — locked */}
+              <li>
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-white/60 border border-border/40 opacity-70">
+                  <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                    <FileText size={16} className="text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-[13px] font-semibold text-muted-foreground leading-tight">Get your Readiness Report</p>
+                      <Lock size={10} className="text-muted-foreground/60" />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                      AI-powered cost estimate, risk assessment &amp; regulatory checklist.
+                    </p>
+                  </div>
+                </div>
+              </li>
+
+              {/* Step 3 — locked */}
+              <li>
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-white/60 border border-border/40 opacity-70">
+                  <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                    <Camera size={16} className="text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-[13px] font-semibold text-muted-foreground leading-tight">Capture your space</p>
+                      <Lock size={10} className="text-muted-foreground/60" />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                      Upload a Polycam scan for precise measurements.
+                    </p>
+                  </div>
+                </div>
+              </li>
+            </ol>
           </div>
-        </Link>
+        ) : (
+          <Link href="/intake/home-type">
+            <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-dashed border-[#1E3A5F]/30 mb-4 hover:border-[#1E3A5F]/50 hover:bg-[#1E3A5F]/[0.02] transition-all">
+              <div className="w-10 h-10 rounded-full bg-[#1E3A5F]/10 flex items-center justify-center flex-shrink-0">
+                <Plus size={20} className="text-[#1E3A5F]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">Start New Assessment</p>
+                <p className="text-[11px] text-muted-foreground">Get your personalized Renovation Readiness Report</p>
+              </div>
+              <ArrowRight size={16} className="text-muted-foreground flex-shrink-0" />
+            </div>
+          </Link>
+        )}
 
         {/* ── Active Project Card ── */}
         {!loading && latestReport && (

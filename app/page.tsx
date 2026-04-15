@@ -181,7 +181,7 @@ export default function WelcomePage() {
             </Button>
           </Link>
           <p className="text-[10px] md:text-xs text-center text-muted-foreground">
-            No credit card required. Your complimentary AI assessment takes 5 minutes.
+            5 minutes · No credit card · Instant results
           </p>
           <p className="text-[10px] md:text-xs text-center text-muted-foreground/70 font-medium italic">
             Renovation without the fiction.
