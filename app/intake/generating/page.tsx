@@ -66,18 +66,31 @@ function GeneratingContent() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
-      const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}`, {
-        headers: getAuthHeaders(),
+      // Cache-bust query param + no-store to bypass Railway/Fastly edge cache
+      const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}?t=${Date.now()}`, {
+        headers: { ...getAuthHeaders(), "Cache-Control": "no-cache", Pragma: "no-cache" },
+        cache: "no-store",
       });
       if (!res.ok) throw new Error(`Status ${res.status}`);
       const data = await res.json();
 
-      if (data.status === "completed" || data.report_json != null) {
+      // Broadened completion detection: accept multiple "done" status values or a populated report_json
+      const status = String(data?.status ?? "").toLowerCase();
+      const hasReport =
+        data?.report_json != null &&
+        typeof data.report_json === "object" &&
+        Object.keys(data.report_json).length > 0;
+      const isDone =
+        status === "completed" || status === "complete" ||
+        status === "success" || status === "done" || status === "ready" ||
+        hasReport;
+
+      if (isDone) {
         redirected.current = true;
-        router.push(`/readiness/${reportId}`);
+        router.replace(`/readiness/${reportId}`);
         return;
       }
-      if (data.status === "failed") {
+      if (status === "failed" || status === "error") {
         setErrorState("failed");
         return;
       }
@@ -92,6 +105,8 @@ function GeneratingContent() {
 
   useEffect(() => {
     if (!reportId) return;
+    // Fire immediately, then every 3s — removes the 3s wait before the first check
+    pollReport();
     const interval = setInterval(pollReport, 3000);
     return () => clearInterval(interval);
   }, [reportId, pollReport]);
