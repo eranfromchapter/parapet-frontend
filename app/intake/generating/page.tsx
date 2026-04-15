@@ -33,6 +33,15 @@ function GeneratingContent() {
   const pollCount = useRef(0);
   const redirected = useRef(false);
 
+  // TEMP — visible debug state, mirrors refs/poll results into React state so
+  // the on-screen panel re-renders when polls fire. Remove once root-caused.
+  const [pollCountState, setPollCountState] = useState(0);
+  const [lastHttpStatus, setLastHttpStatus] = useState<number | null>(null);
+  const [lastStatusValue, setLastStatusValue] = useState<string | null>(null);
+  const [lastHasReportJson, setLastHasReportJson] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [reportReady, setReportReady] = useState(false);
+
   // Animation progress
   useEffect(() => {
     const tick = () => {
@@ -68,12 +77,14 @@ function GeneratingContent() {
     }
 
     try {
+      setPollCountState((c) => c + 1);
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://ai-owners-rep-production.up.railway.app";
       // Cache-bust query param + no-store to bypass Railway/Fastly edge cache
       const res = await fetch(`${apiUrl}/v1/readiness-reports/${reportId}?t=${Date.now()}`, {
         headers: { ...getAuthHeaders(), "Cache-Control": "no-cache", Pragma: "no-cache" },
         cache: "no-store",
       });
+      setLastHttpStatus(res.status);
       if (!res.ok) throw new Error(`Status ${res.status}`);
       const data = await res.json();
 
@@ -96,6 +107,12 @@ function GeneratingContent() {
         elapsedSeconds,
         progressPct: data?.progress_pct,
       });
+
+      // Mirror into React state for the on-screen debug panel + emergency button gate
+      setLastStatusValue(status || null);
+      setLastHasReportJson(hasReportJson);
+      setLastError(null);
+      if (hasReportJson || isDone) setReportReady(true);
 
       // HARD FALLBACK: If we've been polling for over 30 seconds and report_json exists, navigate immediately.
       // window.location.href is ugly but bypasses the Next.js router entirely — it CANNOT be silently dropped
@@ -126,6 +143,7 @@ function GeneratingContent() {
       // Still processing — keep polling
     } catch (err) {
       pollCount.current++;
+      setLastError(err instanceof Error ? err.message : String(err));
       console.warn("[generating] poll error", pollCount.current, err);
       // Only trip the error-count timeout after a long streak of network errors,
       // and never before the hard timeout — the hard timeout is the source of truth.
@@ -145,47 +163,93 @@ function GeneratingContent() {
 
   const overallProgress = Math.min((elapsed / TOTAL_DURATION) * 100, 100);
   const remainingSeconds = Math.max(0, Math.ceil((TOTAL_DURATION - elapsed) / 1000));
+  const elapsedSecUI = Math.round(elapsed / 1000);
+  const hasTokenUI = typeof window !== "undefined" && !!localStorage.getItem("parapet_token");
+
+  // TEMP — on-screen debug panel pinned to the bottom of the viewport.
+  // Visible on mobile where there is no devtools console. Remove once root-caused.
+  const debugPanel = (
+    <div
+      style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 9999 }}
+      className="bg-gray-100 border-t border-gray-300 text-[10px] text-gray-800 px-3 py-2 font-mono leading-tight"
+    >
+      <div className="font-bold mb-0.5">PARAPET DEBUG</div>
+      <div>poll #{pollCountState} · elapsed {elapsedSecUI}s · id {reportId ?? "—"}</div>
+      <div>
+        HTTP {lastHttpStatus ?? "—"} · status:{" "}
+        <span className="font-bold">{lastStatusValue ?? "—"}</span> · report_json:{" "}
+        <span className={lastHasReportJson ? "text-emerald-700 font-bold" : ""}>
+          {lastHasReportJson ? "YES" : "no"}
+        </span>{" "}
+        · token {hasTokenUI ? "yes" : "MISSING"}
+      </div>
+      {lastError && <div className="text-red-600 break-all">err: {lastError}</div>}
+    </div>
+  );
+
+  // Emergency manual-navigation button. Shown whenever a poll has confirmed the
+  // report is ready, so the user is never stuck even if all automatic paths fail.
+  const emergencyButton = reportReady ? (
+    <div className="px-6 pb-4 w-full max-w-[340px]">
+      <button
+        onClick={() => {
+          if (reportId) window.location.href = `/readiness/${reportId}`;
+        }}
+        className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-600/30"
+      >
+        Your Report is Ready — Tap to View
+      </button>
+    </div>
+  ) : null;
 
   // Error: pipeline failed
   if (errorState === "failed") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background px-8">
-        <ParapetLogo size={48} className="text-[#1E3A5F] mb-6" />
-        <h1 className="text-lg font-bold text-foreground mb-2">Something went wrong</h1>
-        <p className="text-sm text-muted-foreground text-center mb-6">
-          We couldn&apos;t generate your report. Please try again.
-        </p>
-        <button
-          onClick={() => router.push("/intake/review")}
-          className="px-6 py-3 bg-[#1E3A5F] text-white rounded-xl font-medium text-sm hover:bg-[#2A4F7A] transition-colors"
-        >
-          Try Again
-        </button>
-      </div>
+      <>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-background px-8 pb-24">
+          <ParapetLogo size={48} className="text-[#1E3A5F] mb-6" />
+          <h1 className="text-lg font-bold text-foreground mb-2">Something went wrong</h1>
+          <p className="text-sm text-muted-foreground text-center mb-6">
+            We couldn&apos;t generate your report. Please try again.
+          </p>
+          {emergencyButton}
+          <button
+            onClick={() => router.push("/intake/review")}
+            className="px-6 py-3 bg-[#1E3A5F] text-white rounded-xl font-medium text-sm hover:bg-[#2A4F7A] transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+        {debugPanel}
+      </>
     );
   }
 
   // Error: hard timeout
   if (errorState === "timeout") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background px-8">
-        <ParapetLogo size={48} className="text-[#1E3A5F] mb-6" />
-        <h1 className="text-lg font-bold text-foreground mb-2">Taking longer than expected</h1>
-        <p className="text-sm text-muted-foreground text-center mb-6">
-          Your report is taking longer than expected. Please check back in a few minutes.
-        </p>
-        <button
-          onClick={() => router.push("/")}
-          className="px-6 py-3 bg-[#1E3A5F] text-white rounded-xl font-medium text-sm hover:bg-[#2A4F7A] transition-colors"
-        >
-          Back to Home
-        </button>
-      </div>
+      <>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-background px-8 pb-24">
+          <ParapetLogo size={48} className="text-[#1E3A5F] mb-6" />
+          <h1 className="text-lg font-bold text-foreground mb-2">Taking longer than expected</h1>
+          <p className="text-sm text-muted-foreground text-center mb-6">
+            Your report is taking longer than expected. Please check back in a few minutes.
+          </p>
+          {emergencyButton}
+          <button
+            onClick={() => router.push("/")}
+            className="px-6 py-3 bg-[#1E3A5F] text-white rounded-xl font-medium text-sm hover:bg-[#2A4F7A] transition-colors"
+          >
+            Back to Home
+          </button>
+        </div>
+        {debugPanel}
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background pb-24">
       <div className="flex-1 flex flex-col items-center justify-center px-8">
         <div className="relative w-20 h-20 mb-8">
           <svg className="w-20 h-20 animate-[spin_2.5s_linear_infinite]" viewBox="0 0 80 80" fill="none">
@@ -265,12 +329,17 @@ function GeneratingContent() {
         </div>
       </div>
 
+      {emergencyButton && (
+        <div className="flex justify-center w-full">{emergencyButton}</div>
+      )}
+
       <div className="px-8 pb-8 text-center">
         <p className="text-[10px] text-muted-foreground leading-relaxed">
           Parapet AI is analyzing your project against local regulations,
           market data, and comparable project outcomes.
         </p>
       </div>
+      {debugPanel}
     </div>
   );
 }
