@@ -326,7 +326,7 @@ export default function ReadinessReportPage() {
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/40">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <button onClick={() => router.push("/dashboard")} className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors">
+            <button onClick={() => router.push("/documents")} className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors">
               <ChevronLeft size={22} className="text-foreground" />
             </button>
             <div>
