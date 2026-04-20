@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  FileText, ScanLine, Video, Palette, FolderOpen,
+  FileText, ScanLine, Video, Palette, Calculator, FolderOpen,
   ChevronRight, Loader2,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -19,7 +19,7 @@ const API_URL = "/api/backend";
 
 interface Document {
   id: string;
-  type: "report" | "spatial" | "walkthrough" | "design";
+  type: "report" | "spatial" | "walkthrough" | "design" | "estimate";
   title: string;
   subtitle: string;
   status: string;
@@ -27,11 +27,12 @@ interface Document {
   source: string;
   icon: string;
   actions: string[];
+  total_estimate?: number;
 }
 
 interface Stats {
   total: number;
-  by_type: { reports: number; spatial: number; walkthroughs: number; designs: number };
+  by_type: { reports: number; spatial: number; walkthroughs: number; designs: number; estimates: number };
 }
 
 const ICON_MAP: Record<string, typeof FileText> = {
@@ -39,6 +40,7 @@ const ICON_MAP: Record<string, typeof FileText> = {
   spatial: ScanLine,
   walkthrough: Video,
   design: Palette,
+  estimate: Calculator,
 };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
@@ -68,11 +70,19 @@ function getDocHref(doc: Document): string {
     case "spatial": return "/capture";
     case "walkthrough": return "/capture";
     case "design": return `/design/results?session=${doc.id}`;
+    case "estimate": return `/estimate/${doc.id}`;
     default: return "#";
   }
 }
 
-type FilterType = "all" | "report" | "spatial" | "walkthrough" | "design";
+function getDocSubtitle(doc: Document): string {
+  if (doc.type === "estimate" && typeof doc.total_estimate === "number") {
+    return `$${Math.round(doc.total_estimate).toLocaleString()}`;
+  }
+  return doc.subtitle;
+}
+
+type FilterType = "all" | "report" | "spatial" | "walkthrough" | "design" | "estimate";
 
 const FILTERS: { key: FilterType; label: string; statsKey?: keyof Stats["by_type"] }[] = [
   { key: "all", label: "All" },
@@ -80,6 +90,7 @@ const FILTERS: { key: FilterType; label: string; statsKey?: keyof Stats["by_type
   { key: "spatial", label: "Scans", statsKey: "spatial" },
   { key: "walkthrough", label: "Videos", statsKey: "walkthroughs" },
   { key: "design", label: "Designs", statsKey: "designs" },
+  { key: "estimate", label: "Estimates", statsKey: "estimates" },
 ];
 
 export default function DocumentVaultPage() {
@@ -206,6 +217,7 @@ export default function DocumentVaultPage() {
           filtered.map((doc) => {
             const Icon = ICON_MAP[doc.type] ?? FileText;
             const st = STATUS_STYLES[doc.status] ?? STATUS_STYLES.uploaded;
+            const subtitle = getDocSubtitle(doc);
 
             return (
               <Link key={doc.id} href={getDocHref(doc)}>
@@ -215,8 +227,8 @@ export default function DocumentVaultPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate">{doc.title}</p>
-                    {doc.subtitle && (
-                      <p className="text-[11px] text-muted-foreground truncate">{doc.subtitle}</p>
+                    {subtitle && (
+                      <p className="text-[11px] text-muted-foreground truncate">{subtitle}</p>
                     )}
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${st.bg} ${st.text}`}>
