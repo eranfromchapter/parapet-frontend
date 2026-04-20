@@ -1,18 +1,17 @@
 'use client';
 
-import { useEffect, useState, Suspense } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   ChevronLeft, Download, ArrowRight, DollarSign,
-  MessageSquare, FileText, ChevronDown, ChevronUp,
+  MessageSquare, FileText, ChevronDown, ChevronUp, FolderOpen,
 } from "lucide-react";
 import ParapetLogo from "@/components/ParapetLogo";
 import BottomNav from "@/components/BottomNav";
-import { getAuthHeaders } from "@/lib/auth";
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import { getAuthHeaders, clearAuth } from "@/lib/auth";
 
 // Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
 const API_URL = "/api/backend";
@@ -20,48 +19,95 @@ const API_URL = "/api/backend";
 const formatCurrency = (n: number | null | undefined): string =>
   n != null ? `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "\u2014";
 
-function EstimateViewContent() {
+interface LineItem {
+  item_code?: string;
+  description?: string;
+  category?: string;
+  room?: string;
+  quantity?: number | string;
+  unit?: string;
+  unit_cost?: number;
+  subtotal?: number;
+  confidence_score?: number;
+  pricing_source?: string;
+}
+
+interface CostRange {
+  low?: number;
+  expected?: number;
+  high?: number;
+}
+
+interface Provenance {
+  source?: string;
+  walkthrough_status?: string;
+  pipeline_version?: string;
+  rooms_parsed?: number;
+}
+
+interface Estimate {
+  id: string;
+  homeowner_id?: string;
+  spatial_id?: string | null;
+  walkthrough_id?: string | null;
+  readiness_report_id?: string | null;
+  status?: string;
+  source?: string;
+  line_items: LineItem[];
+  category_totals: Record<string, number>;
+  grand_total: number;
+  cost_estimate: CostRange;
+  provenance?: Provenance;
+  created_at?: string;
+  updated_at?: string;
+}
+
+type LoadState =
+  | { kind: "loading" }
+  | { kind: "ok"; estimate: Estimate }
+  | { kind: "not-found" }
+  | { kind: "error"; message: string };
+
+export default function EstimateViewPage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const spatialId = params.id as string;
-  const walkthroughId = searchParams.get("wt");
+  const estimateId = params.id as string;
 
-  const [estimate, setEstimate] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchEstimate() {
-      try {
-        const wtParam = walkthroughId ? `?walkthrough_id=${walkthroughId}` : "";
-        const res = await fetch(`${API_URL}/v1/spatial/${spatialId}/estimate${wtParam}`, { method: "POST", headers: getAuthHeaders() });
-        if (res.ok) {
-          setEstimate(await res.json());
-          return;
-        }
-
-        // Fallback: check if the spatial model has cached estimate data
-        const getRes = await fetch(`${API_URL}/v1/spatial/${spatialId}`, { headers: getAuthHeaders() });
-        if (!getRes.ok) throw new Error(`Spatial model not found (${getRes.status})`);
-        const data = await getRes.json();
-        if (data.estimate) {
-          setEstimate(data.estimate);
-          return;
-        }
-
-        throw new Error("No estimate data available. Please upload a Polycam PDF first.");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load estimate");
-      } finally {
-        setLoading(false);
+  const loadEstimate = useCallback(async () => {
+    setState({ kind: "loading" });
+    try {
+      const res = await fetch(`${API_URL}/v1/estimates/${estimateId}`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.status === 401 || res.status === 403) {
+        clearAuth();
+        router.push("/login");
+        return;
       }
+      if (res.status === 404) {
+        setState({ kind: "not-found" });
+        return;
+      }
+      if (!res.ok) {
+        setState({ kind: "error", message: `Server responded ${res.status}` });
+        return;
+      }
+      const data = (await res.json()) as Estimate;
+      setState({ kind: "ok", estimate: data });
+    } catch (err) {
+      setState({ kind: "error", message: err instanceof Error ? err.message : "Network error" });
     }
-    fetchEstimate();
-  }, [spatialId, walkthroughId]);
+  }, [estimateId, router]);
 
-  if (loading) {
+  useEffect(() => {
+    if (!estimateId) return;
+    loadEstimate();
+  }, [estimateId, loadEstimate]);
+
+  if (state.kind === "loading") {
     return (
       <div className="max-w-[430px] mx-auto min-h-[100dvh] flex items-center justify-center bg-background shadow-xl">
         <div className="flex flex-col items-center gap-4">
@@ -72,31 +118,53 @@ function EstimateViewContent() {
     );
   }
 
-  if (error || !estimate) {
+  if (state.kind === "not-found") {
     return (
       <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col items-center justify-center bg-background px-6 shadow-xl">
-        <ParapetLogo size={48} className="text-[#1E3A5F] mb-6" />
-        <h1 className="text-lg font-bold text-foreground mb-2">Estimate not available</h1>
-        <p className="text-sm text-muted-foreground text-center mb-6">{error || "No estimate data found."}</p>
-        <button onClick={() => router.push("/capture")} className="text-sm font-medium text-[#1E3A5F] hover:underline">Back to Space Capture</button>
+        <FolderOpen size={48} className="text-[#1E3A5F]/30 mb-4" />
+        <h1 className="text-lg font-bold text-foreground mb-2">Estimate not found</h1>
+        <p className="text-sm text-muted-foreground text-center mb-6">
+          This estimate may have been removed or you don&apos;t have access to it.
+        </p>
+        <Link
+          href="/documents"
+          className="px-6 py-3 bg-[#1E3A5F] text-white rounded-xl text-sm font-medium hover:bg-[#2A4F7A] transition-colors"
+        >
+          Back to Document Vault
+        </Link>
       </div>
     );
   }
 
-  // Extract data
-  const lineItems: any[] = estimate.line_items ?? [];
+  if (state.kind === "error") {
+    return (
+      <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col items-center justify-center bg-background px-6 shadow-xl">
+        <ParapetLogo size={48} className="text-[#1E3A5F] mb-6" />
+        <h1 className="text-lg font-bold text-foreground mb-2">We couldn&apos;t load this estimate</h1>
+        <p className="text-sm text-muted-foreground text-center mb-6">{state.message}</p>
+        <button
+          onClick={loadEstimate}
+          className="px-6 py-3 bg-[#1E3A5F] text-white rounded-xl text-sm font-medium hover:bg-[#2A4F7A] transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const estimate = state.estimate;
+  const lineItems: LineItem[] = estimate.line_items ?? [];
   const categoryTotals: Record<string, number> = estimate.category_totals ?? {};
-  const subtotal = estimate.subtotal ?? 0;
-  const generalConditions = estimate.general_conditions ?? 0;
   const grandTotal = estimate.grand_total ?? 0;
+  const subtotal = lineItems.reduce((s, it) => s + (it.subtotal ?? 0), 0);
+  const generalConditions = Math.max(0, grandTotal - subtotal);
   const costEstimate = estimate.cost_estimate ?? {};
   const lowCost = costEstimate.low ?? grandTotal * 0.8;
   const expectedCost = costEstimate.expected ?? grandTotal;
   const highCost = costEstimate.high ?? grandTotal * 1.25;
   const provenance = estimate.provenance ?? {};
 
-  // Group line items by category
-  const byCategory: Record<string, any[]> = {};
+  const byCategory: Record<string, LineItem[]> = {};
   for (const item of lineItems) {
     const cat = item.category ?? "Other";
     if (!byCategory[cat]) byCategory[cat] = [];
@@ -171,13 +239,13 @@ function EstimateViewContent() {
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Cost by Category</h3>
 
           <div className="space-y-2 mb-3">
-            {Object.entries(categoryTotals).sort(([, a], [, b]) => (b as number) - (a as number)).map(([cat, total]) => {
-              const pct = grandTotal > 0 ? Math.round(((total as number) / grandTotal) * 100) : 0;
+            {Object.entries(categoryTotals).sort(([, a], [, b]) => b - a).map(([cat, total]) => {
+              const pct = grandTotal > 0 ? Math.round((total / grandTotal) * 100) : 0;
               return (
                 <div key={cat}>
                   <div className="flex items-center justify-between text-xs mb-0.5">
                     <span className="text-foreground font-medium">{cat}</span>
-                    <span className="font-semibold text-foreground">{formatCurrency(total as number)}</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(total)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
@@ -201,7 +269,7 @@ function EstimateViewContent() {
             {categories.map((cat) => {
               const items = byCategory[cat];
               const isExpanded = expandedCategory === cat;
-              const catTotal = items.reduce((s: number, it: any) => s + (it.subtotal ?? 0), 0);
+              const catTotal = items.reduce((s, it) => s + (it.subtotal ?? 0), 0);
 
               return (
                 <div key={cat}>
@@ -222,7 +290,7 @@ function EstimateViewContent() {
 
                   {isExpanded && (
                     <div className="pb-3 space-y-1.5">
-                      {items.map((item: any, idx: number) => (
+                      {items.map((item, idx) => (
                         <div key={idx} className="rounded-md bg-muted/30 px-3 py-2">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
@@ -286,17 +354,5 @@ function EstimateViewContent() {
 
       <BottomNav />
     </div>
-  );
-}
-
-export default function EstimateViewPage() {
-  return (
-    <Suspense fallback={
-      <div className="max-w-[430px] mx-auto min-h-[100dvh] flex items-center justify-center bg-background shadow-xl">
-        <ParapetLogo size={48} className="text-[#1E3A5F] animate-pulse" />
-      </div>
-    }>
-      <EstimateViewContent />
-    </Suspense>
   );
 }

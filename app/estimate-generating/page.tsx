@@ -48,6 +48,7 @@ function EstimateGeneratingContent() {
   const frameRef = useRef<number>();
   const redirected = useRef(false);
   const triggered = useRef(false);
+  const estimateIdRef = useRef<string | null>(null);
 
   // ── Trigger backend processing on mount ──
   // Spatial estimate is SYNCHRONOUS — await its response directly
@@ -112,16 +113,26 @@ function EstimateGeneratingContent() {
           return;
         }
 
-        // If spatial succeeded (with or without walkthrough), we have an estimate
-        // For spatial-only: redirect immediately after animation
-        // For spatial+walkthrough: redirect to estimate after spatial completes
-        //   (walkthrough enriches the estimate later but we can show spatial results now)
-        if (spatialId && spatialResult?.ok) {
+        // If spatial succeeded (with or without walkthrough), we have an estimate.
+        // Route to the persisted estimate by id (backend returns { id } from the POST).
+        if (spatialId && spatialResult && spatialResult.ok) {
+          const rawId = spatialResult.data?.id;
+          const estimateId = typeof rawId === "string" && rawId.length > 0 ? rawId : null;
+
+          if (!estimateId) {
+            // Compute succeeded but persistence failed (best-effort write).
+            // Don't navigate to a broken URL — surface the error and let the user retry.
+            setErrorState("failed");
+            setErrorDetail("Estimate generated but couldn't be saved. Please try again.");
+            return;
+          }
+
+          estimateIdRef.current = estimateId;
           const minWait = Math.max(0, totalDuration - (Date.now() - startTime.current));
           setTimeout(() => {
             if (!redirected.current) {
               redirected.current = true;
-              router.push(`/estimate/${spatialId}${walkthroughId ? `?wt=${walkthroughId}` : ""}`);
+              router.push(`/estimate/${estimateId}`);
             }
           }, Math.min(minWait, 3000));
           return;
@@ -175,8 +186,9 @@ function EstimateGeneratingContent() {
 
       if (data.status === "analyzed" || data.analysis) {
         redirected.current = true;
-        // If we also have spatial data, show the estimate; otherwise dashboard
-        router.push(spatialId ? `/estimate/${spatialId}${walkthroughId ? `?wt=${walkthroughId}` : ""}` : "/dashboard");
+        // If a persisted estimate exists (from the spatial POST), go to it; otherwise dashboard.
+        const estId = estimateIdRef.current;
+        router.push(estId ? `/estimate/${estId}` : "/dashboard");
         return;
       }
       if (data.status === "analysis_failed") {
@@ -186,7 +198,7 @@ function EstimateGeneratingContent() {
     } catch {
       // Keep polling
     }
-  }, [walkthroughId, spatialId, router, errorState]);
+  }, [walkthroughId, router, errorState]);
 
   useEffect(() => {
     if (!walkthroughId) return; // No polling needed for spatial-only
