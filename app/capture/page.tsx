@@ -140,6 +140,13 @@ function RecordingOverlay({ seconds, onStop, stream }: { seconds: number; onStop
 export default function SpaceCapturePage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Honor ?from=vault so the vault's Space Scan card returns to /documents on back.
+  const [backPath, setBackPath] = useState<"/dashboard" | "/documents">("/dashboard");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const from = new URLSearchParams(window.location.search).get("from");
+    if (from === "vault") setBackPath("/documents");
+  }, []);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -245,11 +252,22 @@ export default function SpaceCapturePage() {
         const wid = (result.data as Record<string, string>)?.id || (result.data as Record<string, string>)?.walkthrough_id;
         setWalkthroughId(wid || null);
 
+        // Transcription is best-effort: its failure (e.g. OPENAI_API_KEY missing
+        // on the backend) must not surface as an upload failure, since the video
+        // itself was stored successfully.
+        let transcriptionStarted = false;
         if (wid) {
           setUploadProgress("Starting transcription...");
-          await fetch(`${API_URL}/v1/walkthrough/${wid}/transcribe`, { method: "POST", headers: getAuthHeaders() });
+          try {
+            const txRes = await fetch(`${API_URL}/v1/walkthrough/${wid}/transcribe`, { method: "POST", headers: getAuthHeaders() });
+            transcriptionStarted = txRes.ok;
+          } catch {
+            transcriptionStarted = false;
+          }
         }
-        setToast("Video uploaded! Transcription started.");
+        setToast(transcriptionStarted
+          ? "Video uploaded! Transcription started."
+          : "Video uploaded. Transcription will start shortly.");
       } else if (["jpg", "jpeg", "png", "heic"].includes(ext)) {
         const url = URL.createObjectURL(file);
         setPhotos(prev => [...prev, url]);
@@ -316,11 +334,20 @@ export default function SpaceCapturePage() {
           if (!result.ok) throw new Error(result.error || "Upload failed");
           const wid = (result.data as Record<string, string>)?.id || (result.data as Record<string, string>)?.walkthrough_id;
           setWalkthroughId(wid || null);
+          // Transcription is best-effort; don't let a transcribe failure surface as an upload failure.
+          let transcriptionStarted = false;
           if (wid) {
             setUploadProgress("Starting transcription...");
-            await fetch(`${API_URL}/v1/walkthrough/${wid}/transcribe`, { method: "POST", headers: getAuthHeaders() });
+            try {
+              const txRes = await fetch(`${API_URL}/v1/walkthrough/${wid}/transcribe`, { method: "POST", headers: getAuthHeaders() });
+              transcriptionStarted = txRes.ok;
+            } catch {
+              transcriptionStarted = false;
+            }
           }
-          setToast("Video recorded and uploaded!");
+          setToast(transcriptionStarted
+            ? "Video recorded and uploaded!"
+            : "Video recorded and uploaded. Transcription will start shortly.");
         } catch (err) {
           setToast(err instanceof Error ? err.message : "Upload failed");
         } finally {
@@ -373,7 +400,7 @@ export default function SpaceCapturePage() {
         {/* Header */}
         <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/40">
           <div className="flex items-center gap-2 px-4 py-3">
-            <button onClick={() => router.push("/dashboard")} className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors">
+            <button onClick={() => router.push(backPath)} className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors">
               <ChevronLeft size={22} className="text-foreground" />
             </button>
             <div>

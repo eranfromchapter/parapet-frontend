@@ -176,6 +176,29 @@ export default function DashboardPage() {
 
       <div className="flex-1 px-4 pt-4 pb-4 safe-bottom overflow-y-auto">
 
+        {/* ── Skeleton while initial data loads (prevents onboarding/active-card flicker) ── */}
+        {loading && (
+          <>
+            <div className="rounded-2xl border border-border/50 bg-card p-5 mb-5 animate-pulse">
+              <div className="h-4 w-40 bg-muted rounded mb-3" />
+              <div className="h-3 w-56 bg-muted/70 rounded mb-4" />
+              <div className="space-y-2">
+                <div className="h-12 bg-muted/60 rounded-xl" />
+                <div className="h-12 bg-muted/40 rounded-xl" />
+                <div className="h-12 bg-muted/40 rounded-xl" />
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-3 mb-5">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="flex flex-col items-center gap-1.5 animate-pulse">
+                  <div className="w-12 h-12 rounded-full bg-muted" />
+                  <div className="h-2.5 w-10 bg-muted rounded" />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
         {/* ── Onboarding (no report yet) OR Start New Assessment ── */}
         {!loading && !latestReport ? (
           <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-[#1E3A5F]/[0.04] to-[#2BCBBA]/[0.05] p-5 mb-5">
@@ -244,7 +267,7 @@ export default function DashboardPage() {
               </li>
             </ol>
           </div>
-        ) : (
+        ) : !loading ? (
           <Link href="/intake/home-type">
             <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-dashed border-[#1E3A5F]/30 mb-4 hover:border-[#1E3A5F]/50 hover:bg-[#1E3A5F]/[0.02] transition-all">
               <div className="w-10 h-10 rounded-full bg-[#1E3A5F]/10 flex items-center justify-center flex-shrink-0">
@@ -257,7 +280,7 @@ export default function DashboardPage() {
               <ArrowRight size={16} className="text-muted-foreground flex-shrink-0" />
             </div>
           </Link>
-        )}
+        ) : null}
 
         {/* ── Active Project Card ── */}
         {!loading && latestReport && (

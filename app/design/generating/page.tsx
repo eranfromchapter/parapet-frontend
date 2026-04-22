@@ -78,6 +78,18 @@ function GeneratingContent() {
     return () => clearInterval(timer);
   }, [status]);
 
+  // Auto-navigate to results as soon as generation completes (brief delay so the
+  // completion checkmark is perceptible, but no manual tap required).
+  useEffect(() => {
+    if (status !== "complete" || !sessionId || redirected.current) return;
+    const t = setTimeout(() => {
+      if (redirected.current) return;
+      redirected.current = true;
+      router.push(`/design/results?session=${sessionId}`);
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [status, sessionId, router]);
+
   // Read locally-stored summary from creation form, fall back to API data
   const [localSummary] = useState(() => {
     try {

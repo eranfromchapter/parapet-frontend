@@ -16,6 +16,7 @@ function ResultsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session");
+  const backPath = searchParams.get("from") === "vault" ? "/documents" : "/design";
 
   const [session, setSession] = useState<any>(null);
   const [activeTab, setActiveTab] = useState(0);
@@ -62,7 +63,7 @@ function ResultsContent() {
       <PageHeader
         title="Design Concepts"
         subtitle={`${conceptCount} AI-Generated Option${conceptCount !== 1 ? "s" : ""}`}
-        backPath="/design"
+        backPath={backPath}
       />
 
       {/* Tab bar */}

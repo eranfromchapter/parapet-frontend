@@ -23,6 +23,38 @@ interface Notification {
   source: string;
   read: boolean;
   created_at: string;
+  // Backend may include a typed entity id alongside action_url. Prefer these for
+  // type-correct routing; fall back to action_url only when none are present.
+  report_id?: string;
+  estimate_id?: string;
+  session_id?: string;
+  metadata?: {
+    report_id?: string;
+    estimate_id?: string;
+    session_id?: string;
+  };
+}
+
+function resolveNotificationUrl(n: Notification): string | null {
+  const meta = n.metadata ?? {};
+  switch (n.type) {
+    case "report": {
+      const id = n.report_id ?? meta.report_id;
+      if (id) return `/readiness/${id}`;
+      break;
+    }
+    case "estimate": {
+      const id = n.estimate_id ?? meta.estimate_id;
+      if (id) return `/estimate/${id}`;
+      break;
+    }
+    case "design": {
+      const id = n.session_id ?? meta.session_id;
+      if (id) return `/design/results?session=${id}`;
+      break;
+    }
+  }
+  return n.action_url || null;
 }
 
 const PRIORITY_DOT: Record<string, string> = {
@@ -100,8 +132,9 @@ export default function NotificationsPage() {
         headers: getAuthHeaders(),
       }).catch(() => {});
     }
-    if (n.action_url) {
-      router.push(n.action_url);
+    const target = resolveNotificationUrl(n);
+    if (target) {
+      router.push(target);
     }
   };
 
