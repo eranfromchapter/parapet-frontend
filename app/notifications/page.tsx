@@ -41,7 +41,9 @@ interface Notification {
 
 // Bare `/readiness` and anything under `/intake` are the 7-step intake wizard.
 // Never send a tap there from a completion notification — that's the bug this
-// resolver exists to prevent.
+// resolver exists to prevent. Confirmed against real backend payloads: readiness
+// completion notifications are shipped with `action_url: "/readiness"` and an
+// EMPTY metadata object, so we cannot trust action_url for typed notifications.
 function isIntakeWizardUrl(url: string | undefined | null): boolean {
   if (!url) return false;
   const path = url.split("?")[0].split("#")[0].replace(/\/+$/, "");
@@ -49,44 +51,108 @@ function isIntakeWizardUrl(url: string | undefined | null): boolean {
 }
 
 // Pull an id out of strings like "/readiness/abc123", "/readiness?id=abc123",
-// or "?id=abc123". Returns null if nothing id-shaped is present.
+// "?report_id=abc123", or "?id=abc123". Returns null if nothing id-shaped is present.
 function extractIdFromUrl(url: string | undefined | null): string | null {
   if (!url) return null;
-  const queryMatch = url.match(/[?&]id=([^&#]+)/);
+  const queryMatch = url.match(/[?&](?:id|report_id|estimate_id|session_id|resource_id)=([^&#]+)/);
   if (queryMatch) return decodeURIComponent(queryMatch[1]);
   const pathMatch = url.match(/\/(readiness|estimate|design(?:\/results)?|reports?|capture)\/([^/?#]+)/);
   if (pathMatch) return decodeURIComponent(pathMatch[2]);
   return null;
 }
 
-function resolveNotificationUrl(n: Notification): string {
+type Category = "readiness" | "estimate" | "design" | "spatial" | null;
+
+function categoryOf(type: string | undefined): Category {
+  const t = (type || "").toLowerCase();
+  if (t.includes("estimate")) return "estimate";
+  if (t.includes("readiness") || t.includes("report")) return "readiness";
+  if (t.includes("design")) return "design";
+  if (t.includes("spatial") || t.includes("capture")) return "spatial";
+  return null;
+}
+
+function urlForCategory(cat: Category, id: string): string {
+  switch (cat) {
+    case "readiness": return `/readiness/${id}`;
+    case "estimate": return `/estimate/${id}`;
+    case "design": return `/design/results?session=${id}`;
+    case "spatial": return "/capture";
+    default: return "/dashboard";
+  }
+}
+
+// Synchronous attempt: look only at fields carried by the notification itself.
+// Returns null when nothing id-like is present so the caller can fall back to
+// a vault lookup. Order matters — estimate checked before readiness because
+// "readiness_report" contains "report" too.
+function resolveNotificationUrlSync(n: Notification): string | null {
   const meta = n.metadata ?? {};
-  const t = (n.type || "").toLowerCase();
+  const cat = categoryOf(n.type);
   const resourceId = n.resource_id ?? meta.resource_id;
   const urlId = extractIdFromUrl(n.action_url);
 
-  // Match by substring so backend aliases (readiness_report, readiness, report)
-  // all route to the same place. Check "estimate" before "report" because
-  // "readiness_report" also contains "report" — estimate is more specific.
-  if (t.includes("estimate")) {
+  if (cat === "estimate") {
     const id = n.estimate_id ?? meta.estimate_id ?? resourceId ?? urlId;
-    if (id) return `/estimate/${id}`;
-  } else if (t.includes("readiness") || t.includes("report")) {
-    const id = n.report_id ?? meta.report_id ?? resourceId ?? urlId;
-    if (id) return `/readiness/${id}`;
-    // No id anywhere. Dashboard is safe; bare /readiness is the intake wizard.
-    return "/dashboard";
-  } else if (t.includes("design")) {
-    const id = n.session_id ?? meta.session_id ?? resourceId ?? urlId;
-    if (id) return `/design/results?session=${id}`;
-    return "/dashboard";
-  } else if (t.includes("spatial") || t.includes("capture")) {
-    return "/capture";
+    if (id) return urlForCategory(cat, id);
+    return null;
   }
+  if (cat === "readiness") {
+    const id = n.report_id ?? meta.report_id ?? resourceId ?? urlId;
+    if (id) return urlForCategory(cat, id);
+    return null;
+  }
+  if (cat === "design") {
+    const id = n.session_id ?? meta.session_id ?? resourceId ?? urlId;
+    if (id) return urlForCategory(cat, id);
+    return null;
+  }
+  if (cat === "spatial") return urlForCategory(cat, "");
 
-  // Unknown type. Trust action_url only if it isn't the intake wizard.
+  // Unknown type: trust action_url only if it isn't the intake wizard.
   if (n.action_url && !isIntakeWizardUrl(n.action_url)) return n.action_url;
   return "/dashboard";
+}
+
+// Map a notification category to the document-vault type it corresponds to.
+// Vault types observed from /v1/documents/vault: "report", "design", "estimate",
+// "spatial", "walkthrough".
+function vaultTypeForCategory(cat: Category): string | null {
+  if (cat === "readiness") return "report";
+  if (cat === "estimate") return "estimate";
+  if (cat === "design") return "design";
+  if (cat === "spatial") return "spatial";
+  return null;
+}
+
+interface VaultDoc {
+  id: string;
+  type: string;
+  created_at?: string;
+}
+
+// Fallback path: backend currently ships completion notifications with no id
+// and an empty metadata object (action_url is "/readiness", which IS the intake
+// wizard). Look up the user's most recent matching document and route there.
+async function resolveNotificationUrlViaVault(cat: Category): Promise<string> {
+  const wantType = vaultTypeForCategory(cat);
+  if (!wantType) return "/dashboard";
+  try {
+    const res = await fetch(`${API_URL}/v1/documents/vault`, { headers: getAuthHeaders() });
+    if (!res.ok) return "/dashboard";
+    const data = await res.json();
+    const docs: VaultDoc[] = Array.isArray(data?.documents) ? data.documents : [];
+    const matches = docs.filter((d) => d.type === wantType);
+    if (matches.length === 0) return "/dashboard";
+    matches.sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return tb - ta;
+    });
+    return urlForCategory(cat, matches[0].id);
+  } catch {
+    return "/dashboard";
+  }
 }
 
 const PRIORITY_DOT: Record<string, string> = {
@@ -155,7 +221,7 @@ export default function NotificationsPage() {
   };
 
   const handleTap = async (n: Notification) => {
-    if (!n.read) {
+    if (!n.read && n.id) {
       // Optimistic
       setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
       setUnreadCount(prev => Math.max(0, prev - 1));
@@ -164,10 +230,18 @@ export default function NotificationsPage() {
         headers: getAuthHeaders(),
       }).catch(() => {});
     }
-    const target = resolveNotificationUrl(n);
-    // One-shot dev trace so real payload shape is visible if routing regresses.
+
+    const cat = categoryOf(n.type);
+    let target = resolveNotificationUrlSync(n);
+    if (!target) {
+      // Backend currently omits the id on completion notifications. Look up
+      // the most recent matching document in the vault.
+      target = await resolveNotificationUrlViaVault(cat);
+    }
+
     console.log("[PARAPET] notification tap", {
       type: n.type,
+      category: cat,
       action_url: n.action_url,
       resource_id: n.resource_id,
       report_id: n.report_id,

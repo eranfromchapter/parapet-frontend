@@ -7,7 +7,14 @@ import BottomNav from "@/components/BottomNav";
 export default function TermsOfServicePage() {
   return (
     <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-[#FAFBFC] relative shadow-xl">
-      <PageHeader title="Terms of Service" backPath="/" />
+      <PageHeader
+        title="Terms of Service"
+        onBack={() => {
+          // Return to wherever the user came from (intake review, landing
+          // page footer, /privacy cross-link, etc.) instead of hard-coding "/".
+          if (typeof window !== "undefined") window.history.back();
+        }}
+      />
 
       <div className="flex-1 overflow-y-auto px-5 py-4 pb-8">
         <p className="text-xs text-muted-foreground mb-6">Effective date: April 14, 2026</p>
