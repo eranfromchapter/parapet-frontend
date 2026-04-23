@@ -21,7 +21,7 @@ export default function BottomNav() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
 
     async function fetchUnread() {
       try {
@@ -29,17 +29,21 @@ export default function BottomNav() {
         if (!token) return;
         const res = await fetch(`${API_URL}/v1/notifications/unread-count`, {
           headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
         });
-        if (res.ok && active) {
+        if (res.ok) {
           const data = await res.json();
           setUnreadCount(data.unread_count ?? 0);
         }
-      } catch { /* fail silently */ }
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return;
+        /* fail silently for other errors */
+      }
     }
 
     fetchUnread();
     const interval = setInterval(fetchUnread, 60000);
-    return () => { active = false; clearInterval(interval); };
+    return () => { controller.abort(); clearInterval(interval); };
   }, []);
 
   return (

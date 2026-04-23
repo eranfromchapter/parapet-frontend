@@ -30,12 +30,20 @@ function GeneratingContent() {
   const [sessionData, setSessionData] = useState<any>(null);
   const startTime = useRef(Date.now());
   const redirected = useRef(false);
+  // statusRef mirrors the status state so pollSession can read it without
+  // being a dependency — avoids recreating the callback (and restarting the
+  // interval) every time status changes.
+  const statusRef = useRef<"processing" | "complete">("processing");
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const pollSession = useCallback(async () => {
-    if (!sessionId || redirected.current || status === "complete") return;
+    if (!sessionId || redirected.current || statusRef.current === "complete") return;
 
-    // Hard timeout at 180s
-    if (Date.now() - startTime.current > 180_000) return;
+    // Hard timeout at 180s — clear the interval so it stops firing
+    if (Date.now() - startTime.current > 180_000) {
+      if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }
+      return;
+    }
 
     try {
       const res = await fetch(`${API_URL}/v1/design/${sessionId}`, {
@@ -46,6 +54,7 @@ function GeneratingContent() {
       setSessionData(data);
 
       if (data.status === "complete" || data.status === "completed") {
+        statusRef.current = "complete";
         setStatus("complete");
         setCurrentStep(STEPS.length);
         try { localStorage.removeItem("parapet_design_summary"); } catch {}
@@ -57,13 +66,15 @@ function GeneratingContent() {
         setCurrentStep(Math.min(Math.floor((data.progress_pct / 100) * STEPS.length), STEPS.length - 1));
       }
     } catch { /* keep polling */ }
-  }, [sessionId, status]);
+  }, [sessionId]);
 
   useEffect(() => {
     if (!sessionId) return;
-    const interval = setInterval(pollSession, 3000);
+    pollIntervalRef.current = setInterval(pollSession, 3000);
     pollSession();
-    return () => clearInterval(interval);
+    return () => {
+      if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }
+    };
   }, [sessionId, pollSession]);
 
   // Animated step progress for visual feedback

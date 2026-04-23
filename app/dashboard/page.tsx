@@ -45,26 +45,25 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        // Fetch user profile for avatar initials
-        try {
-          const profileRes = await fetch(`${API_URL}/v1/users/profile`, {
-            headers: getAuthHeaders(),
-          });
-          if (profileRes.ok) {
-            const profile = await profileRes.json();
-            const first = profile.first_name;
-            const last = profile.last_name;
-            if (first && last) setUserInitials(`${first[0]}${last[0]}`.toUpperCase());
-            else if (first) setUserInitials(first[0].toUpperCase());
-          }
-        } catch { /* profile fetch optional */ }
+        // Run profile, reports list, and walkthroughs in parallel — saves 2 RTTs
+        const [profileResult, reportsResult, wtResult] = await Promise.allSettled([
+          fetch(`${API_URL}/v1/users/profile`, { headers: getAuthHeaders() }),
+          fetch(`${API_URL}/v1/readiness-reports`, { headers: getAuthHeaders() }),
+          fetch(`${API_URL}/v1/walkthrough`, { headers: getAuthHeaders() }),
+        ]);
 
-        // Fetch readiness reports
-        const res = await fetch(`${API_URL}/v1/readiness-reports`, {
-          headers: getAuthHeaders(),
-        });
-        if (res.ok) {
-          const data = await res.json();
+        // Profile
+        if (profileResult.status === "fulfilled" && profileResult.value.ok) {
+          const profile = await profileResult.value.json();
+          const first = profile.first_name;
+          const last = profile.last_name;
+          if (first && last) setUserInitials(`${first[0]}${last[0]}`.toUpperCase());
+          else if (first) setUserInitials(first[0].toUpperCase());
+        }
+
+        // Reports list → then fetch detail (must wait for list to get the id)
+        if (reportsResult.status === "fulfilled" && reportsResult.value.ok) {
+          const data = await reportsResult.value.json();
           const reports: any[] = Array.isArray(data) ? data : data.reports ?? data.items ?? [];
           const completed = reports.find((r: any) => r.status === "completed");
           if (completed) {
@@ -75,21 +74,14 @@ export default function DashboardPage() {
           }
         }
 
-        // Fetch walkthroughs to find spatial_id
+        // Walkthroughs → spatial_id
         let foundSpatialId: string | null = null;
-        try {
-          const wtRes = await fetch(`${API_URL}/v1/walkthrough`, {
-            headers: getAuthHeaders(),
-          });
-          if (wtRes.ok) {
-            const wts = await wtRes.json();
-            const wtList: any[] = Array.isArray(wts) ? wts : [];
-            const withSpatial = wtList.find((w: any) => w.spatial_id);
-            if (withSpatial?.spatial_id) {
-              foundSpatialId = withSpatial.spatial_id;
-            }
-          }
-        } catch { /* spatial lookup optional */ }
+        if (wtResult.status === "fulfilled" && wtResult.value.ok) {
+          const wts = await wtResult.value.json();
+          const wtList: any[] = Array.isArray(wts) ? wts : [];
+          const withSpatial = wtList.find((w: any) => w.spatial_id);
+          if (withSpatial?.spatial_id) foundSpatialId = withSpatial.spatial_id;
+        }
 
         // Fallback: check localStorage for spatial_id from direct upload
         if (!foundSpatialId) {

@@ -68,15 +68,19 @@ export function IntakeWizardProvider({ children }: { children: React.ReactNode }
     hydratedRef.current = true;
   }, []);
 
-  // Persist after hydration so we don't clobber saved state with defaults on first render
+  // Persist after hydration — debounced 300ms so rapid keystrokes don't
+  // trigger synchronous JSON.stringify + storage write on every character.
   useEffect(() => {
     if (!hydratedRef.current) return;
     if (typeof window === "undefined") return;
-    try {
-      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
-    } catch {
-      /* quota / disabled storage — tolerate silently */
-    }
+    const t = setTimeout(() => {
+      try {
+        window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+      } catch {
+        /* quota / disabled storage — tolerate silently */
+      }
+    }, 300);
+    return () => clearTimeout(t);
   }, [formData]);
 
   const updateFormData = useCallback((updates: Partial<IntakeFormData>) => {

@@ -45,7 +45,6 @@ function EstimateGeneratingContent() {
   const [errorState, setErrorState] = useState<"timeout" | "failed" | null>(null);
   const [errorDetail, setErrorDetail] = useState("");
   const startTime = useRef(Date.now());
-  const frameRef = useRef<number>();
   const redirected = useRef(false);
   const triggered = useRef(false);
   const estimateIdRef = useRef<string | null>(null);
@@ -149,23 +148,27 @@ function EstimateGeneratingContent() {
     triggerProcessing();
   }, [spatialId, walkthroughId, router, totalDuration]);
 
-  // Animation
+  // Animation — 500ms interval is sufficient for text labels and progress bars;
+  // rAF at 60fps caused excessive re-renders during multi-minute waits.
   useEffect(() => {
-    const tick = () => {
+    const timer = setInterval(() => {
       const dt = Date.now() - startTime.current;
-      setElapsed(dt);
+      setElapsed(prev => (Math.abs(dt - prev) > 100 ? dt : prev));
 
+      let nextStep = activeSteps.length;
       let cumulative = 0;
       for (let i = 0; i < activeSteps.length; i++) {
         cumulative += activeSteps[i].duration;
-        if (dt < cumulative) { setActiveStep(i); break; }
-        if (i === activeSteps.length - 1) setActiveStep(activeSteps.length);
+        if (dt < cumulative) { nextStep = i; break; }
       }
-      if (dt >= totalDuration) setAnimationDone(true);
-      if (dt < totalDuration) frameRef.current = requestAnimationFrame(tick);
-    };
-    frameRef.current = requestAnimationFrame(tick);
-    return () => { if (frameRef.current) cancelAnimationFrame(frameRef.current); };
+      setActiveStep(nextStep);
+
+      if (dt >= totalDuration) {
+        setAnimationDone(true);
+        clearInterval(timer);
+      }
+    }, 500);
+    return () => clearInterval(timer);
   }, [activeSteps, totalDuration]);
 
   // Poll walkthrough status (only when walkthrough is involved)

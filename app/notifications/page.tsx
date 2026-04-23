@@ -239,17 +239,6 @@ export default function NotificationsPage() {
       target = await resolveNotificationUrlViaVault(cat);
     }
 
-    console.log("[PARAPET] notification tap", {
-      type: n.type,
-      category: cat,
-      action_url: n.action_url,
-      resource_id: n.resource_id,
-      report_id: n.report_id,
-      estimate_id: n.estimate_id,
-      session_id: n.session_id,
-      metadata: n.metadata,
-      resolved: target,
-    });
     router.push(target);
   };
 

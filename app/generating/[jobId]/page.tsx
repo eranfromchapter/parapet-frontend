@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Home, CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
@@ -26,35 +26,39 @@ export default function GeneratingPage({ params }: { params: { jobId: string } }
   const [progress, setProgress] = useState(0);
 
   const completedStages = Math.min(Math.floor(progress / (100 / STAGES.length)), STAGES.length);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    const pollInterval = setInterval(async () => {
+    const stopAll = () => {
+      if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }
+      if (timerIntervalRef.current) { clearInterval(timerIntervalRef.current); timerIntervalRef.current = null; }
+    };
+
+    pollIntervalRef.current = setInterval(async () => {
       try {
         const data = await api.getReadinessReport(jobId);
         if (data.progress_pct) {
           setProgress(data.progress_pct);
         }
         if (data.status === 'completed') {
-          clearInterval(pollInterval);
-          clearInterval(timerInterval);
+          stopAll();
           setProgress(100);
           setTimeout(() => router.push(`/reports/${data.id}`), 500);
         } else if (data.status === 'failed') {
-          clearInterval(pollInterval);
-          clearInterval(timerInterval);
+          stopAll();
           setError(true);
         }
-      } catch (err) {
-        console.error('Poll error:', err);
+      } catch {
+        /* keep polling */
       }
     }, 3000);
 
-    const timerInterval = setInterval(() => {
+    timerIntervalRef.current = setInterval(() => {
       setElapsed((e) => {
         if (e >= 180) {
           setTimedOut(true);
-          clearInterval(pollInterval);
-          clearInterval(timerInterval);
+          stopAll();
         }
         return e + 1;
       });
@@ -64,10 +68,7 @@ export default function GeneratingPage({ params }: { params: { jobId: string } }
       });
     }, 1000);
 
-    return () => {
-      clearInterval(pollInterval);
-      clearInterval(timerInterval);
-    };
+    return stopAll;
   }, [jobId, router]);
 
   const handleRetry = () => {

@@ -32,7 +32,6 @@ function GeneratingContent() {
   const [errorState, setErrorState] = useState<"failed" | "timeout" | null>(null);
   const [animationDone, setAnimationDone] = useState(false);
   const startTime = useRef(Date.now());
-  const frameRef = useRef<number>();
   const pollCount = useRef(0);
   const redirected = useRef(false);
 
@@ -41,27 +40,27 @@ function GeneratingContent() {
   // navigation misbehaves.
   const [reportReady, setReportReady] = useState(false);
 
-  // Animation progress
+  // Animation progress — 500ms interval is sufficient for text labels and
+  // progress bars; rAF at 60fps caused ~1,080 unnecessary re-renders.
   useEffect(() => {
-    const tick = () => {
+    const timer = setInterval(() => {
       const dt = Date.now() - startTime.current;
-      setElapsed(dt);
+      setElapsed(prev => (Math.abs(dt - prev) > 100 ? dt : prev));
 
+      let nextStep = ANALYSIS_STEPS.length;
       let cumulative = 0;
       for (let i = 0; i < ANALYSIS_STEPS.length; i++) {
         cumulative += ANALYSIS_STEPS[i].duration;
-        if (dt < cumulative) { setActiveStep(i); break; }
-        if (i === ANALYSIS_STEPS.length - 1) setActiveStep(ANALYSIS_STEPS.length);
+        if (dt < cumulative) { nextStep = i; break; }
       }
+      setActiveStep(nextStep);
 
       if (dt >= TOTAL_DURATION) {
         setAnimationDone(true);
+        clearInterval(timer);
       }
-
-      if (dt < TOTAL_DURATION) frameRef.current = requestAnimationFrame(tick);
-    };
-    frameRef.current = requestAnimationFrame(tick);
-    return () => { if (frameRef.current) cancelAnimationFrame(frameRef.current); };
+    }, 500);
+    return () => clearInterval(timer);
   }, []);
 
   // Poll backend for report status — only redirect when actually completed
@@ -97,12 +96,6 @@ function GeneratingContent() {
         hasReportJson;
 
       const elapsedSeconds = Math.round(totalElapsed / 1000);
-      console.log("[PARAPET] poll", {
-        status,
-        hasReportJson,
-        elapsedSeconds,
-        progressPct: data?.progress_pct,
-      });
 
       // Gate the emergency-button visibility
       if (hasReportJson || isDone) setReportReady(true);
@@ -111,32 +104,27 @@ function GeneratingContent() {
       // window.location.href is ugly but bypasses the Next.js router entirely — it CANNOT be silently dropped
       // by stale closures, unmounted components, or suspense boundaries. Reliability > elegance.
       if (elapsedSeconds > 30 && hasReportJson) {
-        console.log("[PARAPET] HARD FALLBACK: report_json detected, forcing navigation");
         redirected.current = true;
         window.location.href = `/readiness/${reportId}`;
         return;
       }
 
       if (isDone) {
-        console.log("[PARAPET] completion detected → navigating to /readiness/" + reportId);
         redirected.current = true;
         try {
           router.replace(`/readiness/${reportId}`);
-        } catch (e) {
-          console.error("[PARAPET] router.replace failed, using window.location", e);
+        } catch {
           window.location.href = `/readiness/${reportId}`;
         }
         return;
       }
       if (status === "failed" || status === "error") {
-        console.warn("[generating] pipeline reported failure", data);
         setErrorState("failed");
         return;
       }
       // Still processing — keep polling
-    } catch (err) {
+    } catch {
       pollCount.current++;
-      console.warn("[generating] poll error", pollCount.current, err);
       // Only trip the error-count timeout after a long streak of network errors,
       // and never before the hard timeout — the hard timeout is the source of truth.
       if (pollCount.current >= 60) {
