@@ -39,30 +39,54 @@ interface Notification {
   };
 }
 
-function resolveNotificationUrl(n: Notification): string | null {
+// Bare `/readiness` and anything under `/intake` are the 7-step intake wizard.
+// Never send a tap there from a completion notification — that's the bug this
+// resolver exists to prevent.
+function isIntakeWizardUrl(url: string | undefined | null): boolean {
+  if (!url) return false;
+  const path = url.split("?")[0].split("#")[0].replace(/\/+$/, "");
+  return path === "/readiness" || path === "" || path.startsWith("/intake");
+}
+
+// Pull an id out of strings like "/readiness/abc123", "/readiness?id=abc123",
+// or "?id=abc123". Returns null if nothing id-shaped is present.
+function extractIdFromUrl(url: string | undefined | null): string | null {
+  if (!url) return null;
+  const queryMatch = url.match(/[?&]id=([^&#]+)/);
+  if (queryMatch) return decodeURIComponent(queryMatch[1]);
+  const pathMatch = url.match(/\/(readiness|estimate|design(?:\/results)?|reports?|capture)\/([^/?#]+)/);
+  if (pathMatch) return decodeURIComponent(pathMatch[2]);
+  return null;
+}
+
+function resolveNotificationUrl(n: Notification): string {
   const meta = n.metadata ?? {};
   const t = (n.type || "").toLowerCase();
   const resourceId = n.resource_id ?? meta.resource_id;
+  const urlId = extractIdFromUrl(n.action_url);
 
   // Match by substring so backend aliases (readiness_report, readiness, report)
-  // all route to the same place. Check "estimate" before "report" because the
-  // readiness-report string also contains "report" — estimate is more specific.
+  // all route to the same place. Check "estimate" before "report" because
+  // "readiness_report" also contains "report" — estimate is more specific.
   if (t.includes("estimate")) {
-    const id = n.estimate_id ?? meta.estimate_id ?? resourceId;
+    const id = n.estimate_id ?? meta.estimate_id ?? resourceId ?? urlId;
     if (id) return `/estimate/${id}`;
   } else if (t.includes("readiness") || t.includes("report")) {
-    const id = n.report_id ?? meta.report_id ?? resourceId;
+    const id = n.report_id ?? meta.report_id ?? resourceId ?? urlId;
     if (id) return `/readiness/${id}`;
-    return "/readiness";
+    // No id anywhere. Dashboard is safe; bare /readiness is the intake wizard.
+    return "/dashboard";
   } else if (t.includes("design")) {
-    const id = n.session_id ?? meta.session_id ?? resourceId;
+    const id = n.session_id ?? meta.session_id ?? resourceId ?? urlId;
     if (id) return `/design/results?session=${id}`;
-    return "/design/results";
+    return "/dashboard";
   } else if (t.includes("spatial") || t.includes("capture")) {
     return "/capture";
   }
 
-  return n.action_url || "/dashboard";
+  // Unknown type. Trust action_url only if it isn't the intake wizard.
+  if (n.action_url && !isIntakeWizardUrl(n.action_url)) return n.action_url;
+  return "/dashboard";
 }
 
 const PRIORITY_DOT: Record<string, string> = {
@@ -141,9 +165,18 @@ export default function NotificationsPage() {
       }).catch(() => {});
     }
     const target = resolveNotificationUrl(n);
-    if (target) {
-      router.push(target);
-    }
+    // One-shot dev trace so real payload shape is visible if routing regresses.
+    console.log("[PARAPET] notification tap", {
+      type: n.type,
+      action_url: n.action_url,
+      resource_id: n.resource_id,
+      report_id: n.report_id,
+      estimate_id: n.estimate_id,
+      session_id: n.session_id,
+      metadata: n.metadata,
+      resolved: target,
+    });
+    router.push(target);
   };
 
   const filtered = (() => {

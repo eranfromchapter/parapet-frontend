@@ -229,8 +229,8 @@ function GeneratingContent() {
         <h1 className="text-lg font-bold text-foreground text-center mb-2">
           {animationDone ? "Finalizing your report..." : "Generating Your Report"}
         </h1>
-        <p className="text-sm text-muted-foreground text-center max-w-[320px] mb-6">
-          A report like this used to take days to prepare. We&apos;ll have yours ready in about 5 minutes.
+        <p className="text-base text-muted-foreground text-center max-w-[320px] mb-6">
+          A report like this used to take days to prepare. We&apos;ll have yours ready in about 5&ndash;10 min.
         </p>
 
         <div className="w-full max-w-[280px] space-y-2.5 mb-8">

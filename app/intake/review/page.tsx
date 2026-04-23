@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useIntakeWizard } from "@/context/IntakeWizardContext";
 import IntakeWizardShell from "@/components/IntakeWizardShell";
 import { Pencil, ArrowRight } from "lucide-react";
@@ -212,23 +211,23 @@ export default function IntakeReview() {
 
       <p className="text-[10px] text-muted-foreground text-center mt-3 leading-relaxed">
         By submitting, you agree to our{" "}
-        <Link
+        <a
           href="/terms"
           target="_blank"
           rel="noopener noreferrer"
           className="underline hover:text-foreground transition-colors"
         >
           Terms of Service
-        </Link>{" "}
+        </a>{" "}
         and{" "}
-        <Link
+        <a
           href="/privacy"
           target="_blank"
           rel="noopener noreferrer"
           className="underline hover:text-foreground transition-colors"
         >
           Privacy Policy
-        </Link>
+        </a>
         .
       </p>
     </IntakeWizardShell>
