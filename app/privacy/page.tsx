@@ -22,7 +22,7 @@ export default function PrivacyPolicyPage() {
 
         <p className="text-[15px] leading-relaxed text-foreground mb-6">
           New Parapet LLC (&quot;Company,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) operates the PARAPET platform. This Privacy Policy explains how we collect, use, disclose, and protect your personal information when you use our platform and services (collectively, the &quot;Service&quot;). This policy is designed to comply with the New York SHIELD Act and the California Online Privacy Protection Act (CalOPPA). By using the Service, you consent to the practices described in this Privacy Policy. Please also review our{" "}
-          <Link href="/terms" className="text-[#1E3A5F] underline font-medium">Terms of Service</Link>.
+          <Link href="/terms" replace className="text-[#1E3A5F] underline font-medium">Terms of Service</Link>.
         </p>
 
         {/* Section 1: AI Data Processing Disclosure */}

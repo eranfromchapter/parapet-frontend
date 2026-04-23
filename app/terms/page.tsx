@@ -121,7 +121,7 @@ export default function TermsOfServicePage() {
           <h2 className="text-base font-bold text-[#1E3A5F] mb-3">7. Data &amp; Privacy</h2>
           <p className="text-[15px] leading-relaxed text-foreground mb-3">
             Your use of the Service is also governed by our{" "}
-            <Link href="/privacy" className="text-[#1E3A5F] underline font-medium">Privacy Policy</Link>, which describes how we collect, use, store, and protect your personal information. Please review it carefully.
+            <Link href="/privacy" replace className="text-[#1E3A5F] underline font-medium">Privacy Policy</Link>, which describes how we collect, use, store, and protect your personal information. Please review it carefully.
           </p>
           <p className="text-[15px] leading-relaxed text-foreground mb-3">
             User data is stored securely using industry-standard encryption and access controls. We never sell your personal data to third parties.
@@ -201,7 +201,7 @@ export default function TermsOfServicePage() {
           <h2 className="text-base font-bold text-[#1E3A5F] mb-3">14. Entire Agreement</h2>
           <p className="text-[15px] leading-relaxed text-foreground">
             These Terms, together with the{" "}
-            <Link href="/privacy" className="text-[#1E3A5F] underline font-medium">Privacy Policy</Link>, constitute the entire agreement between you and New Parapet LLC with respect to the Service and supersede all prior or contemporaneous understandings, communications, or agreements, whether written or oral.
+            <Link href="/privacy" replace className="text-[#1E3A5F] underline font-medium">Privacy Policy</Link>, constitute the entire agreement between you and New Parapet LLC with respect to the Service and supersede all prior or contemporaneous understandings, communications, or agreements, whether written or oral.
           </p>
         </div>
 
