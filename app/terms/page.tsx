@@ -14,7 +14,7 @@ function TermsOfServiceContent() {
   const handleBack = () => {
     if (typeof window === "undefined") return;
     if (from === 'intake') {
-      window.location.href = '/#/intake/review';
+      window.location.href = '/intake/review';
     } else if (from === 'home') {
       window.location.href = '/';
     } else if (from === 'account') {
