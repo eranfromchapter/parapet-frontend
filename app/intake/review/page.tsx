@@ -212,9 +212,24 @@ export default function IntakeReview() {
 
       <p className="text-[10px] text-muted-foreground text-center mt-3 leading-relaxed">
         By submitting, you agree to our{" "}
-        <Link href="/terms" className="underline hover:text-foreground transition-colors">Terms of Service</Link>{" "}
+        <Link
+          href="/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-foreground transition-colors"
+        >
+          Terms of Service
+        </Link>{" "}
         and{" "}
-        <Link href="/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>.
+        <Link
+          href="/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-foreground transition-colors"
+        >
+          Privacy Policy
+        </Link>
+        .
       </p>
     </IntakeWizardShell>
   );

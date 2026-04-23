@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,11 @@ type LoadState =
 export default function EstimateViewPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const estimateId = params.id as string;
+  const fromVault = searchParams.get("from") === "vault";
+  const headerTitle = fromVault ? "My Documents" : "Your Estimate";
+  const headerSubtitle = fromVault ? "Back to Document Vault" : "Spatial-based line item estimate";
 
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
@@ -182,8 +186,8 @@ export default function EstimateViewPage() {
               <ChevronLeft size={22} className="text-foreground" />
             </button>
             <div>
-              <h1 className="text-base font-semibold text-foreground leading-tight">Your Estimate</h1>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Spatial-based line item estimate</p>
+              <h1 className="text-base font-semibold text-foreground leading-tight">{headerTitle}</h1>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{headerSubtitle}</p>
             </div>
           </div>
           <Button variant="ghost" size="sm" className="text-xs gap-1.5">

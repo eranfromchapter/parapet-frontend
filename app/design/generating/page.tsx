@@ -142,6 +142,9 @@ function GeneratingContent() {
         </div>
 
         <h1 className="text-xl font-bold text-foreground mb-2">Creating Your Design...</h1>
+        <p className="text-sm text-muted-foreground text-center max-w-[320px] mb-3">
+          A custom design package like this used to take weeks. We&apos;ll have yours ready in 10&ndash;15 minutes.
+        </p>
         <p className="text-sm text-muted-foreground mb-1">{STEPS[currentStep] || "Generating design concepts"}...</p>
         <p className="text-xs text-muted-foreground/60 mb-8">Your designs will be ready in 1-2 minutes...</p>
 

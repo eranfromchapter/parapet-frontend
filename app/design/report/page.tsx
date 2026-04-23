@@ -20,6 +20,12 @@ function ReportContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session");
   const conceptIndex = searchParams.get("concept") || "0";
+  const fromVault = searchParams.get("from") === "vault";
+  const headerTitle = fromVault ? "My Documents" : "Design Report";
+  const headerSubtitle = fromVault ? "Back to Document Vault" : "Your Design Journey with PARAPET";
+  const backPath = fromVault
+    ? "/documents"
+    : `/design/results?session=${sessionId}`;
 
   const [conceptData, setConceptData] = useState<any>(null);
   const [sessionData, setSessionData] = useState<any>(null);
@@ -53,7 +59,7 @@ function ReportContent() {
   if (!conceptData) {
     return (
       <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-[#FAFBFC] relative shadow-xl">
-        <PageHeader title="Design Report" backPath={`/design/results?session=${sessionId}`} />
+        <PageHeader title={headerTitle} backPath={backPath} />
         <div className="flex-1 flex flex-col items-center justify-center px-6">
           <p className="text-sm text-muted-foreground">Report not available.</p>
         </div>
@@ -76,7 +82,7 @@ function ReportContent() {
 
   return (
     <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-[#FAFBFC] relative shadow-xl">
-      <PageHeader title="Design Report" subtitle="Your Design Journey with PARAPET" backPath={`/design/results?session=${sessionId}`} />
+      <PageHeader title={headerTitle} subtitle={headerSubtitle} backPath={backPath} />
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-4 pb-4 space-y-5">
 
@@ -307,10 +313,10 @@ function ReportContent() {
 
         {/* Back link */}
         <button
-          onClick={() => router.push(`/design/results?session=${sessionId}`)}
+          onClick={() => router.push(backPath)}
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mx-auto py-2"
         >
-          <ChevronLeft size={14} /> Back to Design Concepts
+          <ChevronLeft size={14} /> {fromVault ? "Back to My Documents" : "Back to Design Concepts"}
         </button>
 
         <div className="h-4" />

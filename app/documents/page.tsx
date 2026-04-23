@@ -65,14 +65,14 @@ function timeAgo(iso: string): string {
 }
 
 function getDocHref(doc: Document): string {
-  // `from=vault` lets shared destinations (capture, design/results) route the
-  // back arrow to /documents instead of their default entry point.
+  // `from=vault` lets shared destinations route the back arrow + header label
+  // to /documents / "My Documents" instead of their default entry point.
   switch (doc.type) {
-    case "report": return `/readiness/${doc.id}`;
+    case "report": return `/readiness/${doc.id}?from=vault`;
     case "spatial": return "/capture?from=vault";
     case "walkthrough": return "/capture?from=vault";
     case "design": return `/design/results?session=${doc.id}&from=vault`;
-    case "estimate": return `/estimate/${doc.id}`;
+    case "estimate": return `/estimate/${doc.id}?from=vault`;
     default: return "#";
   }
 }

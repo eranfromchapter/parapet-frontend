@@ -17,7 +17,9 @@ interface Notification {
   id: string;
   title: string;
   message: string;
-  type: "report" | "estimate" | "design" | "gc_match" | "system";
+  // Backend has used several aliases over time ("report", "readiness_report",
+  // "readiness", "spatial", "capture"). Keep this loose and match by substring below.
+  type: string;
   priority: "low" | "normal" | "high" | "critical";
   action_url: string;
   source: string;
@@ -25,6 +27,7 @@ interface Notification {
   created_at: string;
   // Backend may include a typed entity id alongside action_url. Prefer these for
   // type-correct routing; fall back to action_url only when none are present.
+  resource_id?: string;
   report_id?: string;
   estimate_id?: string;
   session_id?: string;
@@ -32,29 +35,34 @@ interface Notification {
     report_id?: string;
     estimate_id?: string;
     session_id?: string;
+    resource_id?: string;
   };
 }
 
 function resolveNotificationUrl(n: Notification): string | null {
   const meta = n.metadata ?? {};
-  switch (n.type) {
-    case "report": {
-      const id = n.report_id ?? meta.report_id;
-      if (id) return `/readiness/${id}`;
-      break;
-    }
-    case "estimate": {
-      const id = n.estimate_id ?? meta.estimate_id;
-      if (id) return `/estimate/${id}`;
-      break;
-    }
-    case "design": {
-      const id = n.session_id ?? meta.session_id;
-      if (id) return `/design/results?session=${id}`;
-      break;
-    }
+  const t = (n.type || "").toLowerCase();
+  const resourceId = n.resource_id ?? meta.resource_id;
+
+  // Match by substring so backend aliases (readiness_report, readiness, report)
+  // all route to the same place. Check "estimate" before "report" because the
+  // readiness-report string also contains "report" — estimate is more specific.
+  if (t.includes("estimate")) {
+    const id = n.estimate_id ?? meta.estimate_id ?? resourceId;
+    if (id) return `/estimate/${id}`;
+  } else if (t.includes("readiness") || t.includes("report")) {
+    const id = n.report_id ?? meta.report_id ?? resourceId;
+    if (id) return `/readiness/${id}`;
+    return "/readiness";
+  } else if (t.includes("design")) {
+    const id = n.session_id ?? meta.session_id ?? resourceId;
+    if (id) return `/design/results?session=${id}`;
+    return "/design/results";
+  } else if (t.includes("spatial") || t.includes("capture")) {
+    return "/capture";
   }
-  return n.action_url || null;
+
+  return n.action_url || "/dashboard";
 }
 
 const PRIORITY_DOT: Record<string, string> = {
@@ -139,11 +147,18 @@ export default function NotificationsPage() {
   };
 
   const filtered = (() => {
+    const typeOf = (n: Notification) => (n.type || "").toLowerCase();
     switch (filter) {
       case "unread": return notifications.filter(n => !n.read);
-      case "report": return notifications.filter(n => n.type === "report" || n.type === "estimate");
-      case "design": return notifications.filter(n => n.type === "design");
-      case "system": return notifications.filter(n => n.type === "system" || n.type === "gc_match");
+      case "report": return notifications.filter(n => {
+        const t = typeOf(n);
+        return t.includes("report") || t.includes("readiness") || t.includes("estimate");
+      });
+      case "design": return notifications.filter(n => typeOf(n).includes("design"));
+      case "system": return notifications.filter(n => {
+        const t = typeOf(n);
+        return t.includes("system") || t.includes("gc_match");
+      });
       default: return notifications;
     }
   })();

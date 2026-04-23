@@ -140,13 +140,17 @@ function RecordingOverlay({ seconds, onStop, stream }: { seconds: number; onStop
 export default function SpaceCapturePage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Honor ?from=vault so the vault's Space Scan card returns to /documents on back.
-  const [backPath, setBackPath] = useState<"/dashboard" | "/documents">("/dashboard");
+  // Honor ?from=vault so the vault's Space Scan card returns to /documents on back
+  // and the header reflects the return destination.
+  const [fromVault, setFromVault] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const from = new URLSearchParams(window.location.search).get("from");
-    if (from === "vault") setBackPath("/documents");
+    if (from === "vault") setFromVault(true);
   }, []);
+  const backPath: "/dashboard" | "/documents" = fromVault ? "/documents" : "/dashboard";
+  const headerTitle = fromVault ? "My Documents" : "Space Capture";
+  const headerSubtitle = fromVault ? "Back to Document Vault" : "LiDAR & Photo Documentation";
   const photoInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -404,8 +408,8 @@ export default function SpaceCapturePage() {
               <ChevronLeft size={22} className="text-foreground" />
             </button>
             <div>
-              <h1 className="text-base font-semibold text-foreground leading-tight">Space Capture</h1>
-              <p className="text-[10px] text-muted-foreground">LiDAR & Photo Documentation</p>
+              <h1 className="text-base font-semibold text-foreground leading-tight">{headerTitle}</h1>
+              <p className="text-[10px] text-muted-foreground">{headerSubtitle}</p>
             </div>
           </div>
         </header>
