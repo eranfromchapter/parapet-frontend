@@ -1,20 +1,34 @@
 'use client';
 
+import { Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
 
-export default function PrivacyPolicyPage() {
+function PrivacyPolicyContent() {
+  const searchParams = useSearchParams();
+  const from = searchParams.get('from');
+  const crossLinkHref = `/terms${from ? `?from=${from}` : ''}`;
+
+  const handleBack = () => {
+    if (typeof window === "undefined") return;
+    if (from === 'intake') {
+      window.location.href = '/#/intake/review';
+    } else if (from === 'home') {
+      window.location.href = '/';
+    } else if (from === 'account') {
+      window.location.href = '/account';
+    } else if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = '/';
+    }
+  };
+
   return (
     <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-[#FAFBFC] relative shadow-xl">
-      <PageHeader
-        title="Privacy Policy"
-        onBack={() => {
-          // Return to wherever the user came from (intake review, landing
-          // page footer, /terms cross-link, etc.) instead of hard-coding "/".
-          if (typeof window !== "undefined") window.history.back();
-        }}
-      />
+      <PageHeader title="Privacy Policy" onBack={handleBack} />
 
       <div className="flex-1 overflow-y-auto px-5 py-4 pb-8">
         <p className="text-xs text-muted-foreground mb-1">Effective date: April 14, 2026</p>
@@ -22,7 +36,7 @@ export default function PrivacyPolicyPage() {
 
         <p className="text-[15px] leading-relaxed text-foreground mb-6">
           New Parapet LLC (&quot;Company,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) operates the PARAPET platform. This Privacy Policy explains how we collect, use, disclose, and protect your personal information when you use our platform and services (collectively, the &quot;Service&quot;). This policy is designed to comply with the New York SHIELD Act and the California Online Privacy Protection Act (CalOPPA). By using the Service, you consent to the practices described in this Privacy Policy. Please also review our{" "}
-          <Link href="/terms" replace className="text-[#1E3A5F] underline font-medium">Terms of Service</Link>.
+          <Link href={crossLinkHref} replace className="text-[#1E3A5F] underline font-medium">Terms of Service</Link>.
         </p>
 
         {/* Section 1: AI Data Processing Disclosure */}
@@ -253,6 +267,14 @@ export default function PrivacyPolicyPage() {
 
       <BottomNav />
     </div>
+  );
+}
+
+export default function PrivacyPolicyPage() {
+  return (
+    <Suspense fallback={<div className="max-w-[430px] mx-auto min-h-[100dvh] bg-[#FAFBFC]" />}>
+      <PrivacyPolicyContent />
+    </Suspense>
   );
 }
 {/* LEGAL REVIEW REQUIRED BEFORE PUBLICATION */}

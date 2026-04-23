@@ -1,20 +1,34 @@
 'use client';
 
+import { Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
 
-export default function TermsOfServicePage() {
+function TermsOfServiceContent() {
+  const searchParams = useSearchParams();
+  const from = searchParams.get('from');
+  const crossLinkHref = `/privacy${from ? `?from=${from}` : ''}`;
+
+  const handleBack = () => {
+    if (typeof window === "undefined") return;
+    if (from === 'intake') {
+      window.location.href = '/#/intake/review';
+    } else if (from === 'home') {
+      window.location.href = '/';
+    } else if (from === 'account') {
+      window.location.href = '/account';
+    } else if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = '/';
+    }
+  };
+
   return (
     <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-[#FAFBFC] relative shadow-xl">
-      <PageHeader
-        title="Terms of Service"
-        onBack={() => {
-          // Return to wherever the user came from (intake review, landing
-          // page footer, /privacy cross-link, etc.) instead of hard-coding "/".
-          if (typeof window !== "undefined") window.history.back();
-        }}
-      />
+      <PageHeader title="Terms of Service" onBack={handleBack} />
 
       <div className="flex-1 overflow-y-auto px-5 py-4 pb-8">
         <p className="text-xs text-muted-foreground mb-6">Effective date: April 14, 2026</p>
@@ -121,7 +135,7 @@ export default function TermsOfServicePage() {
           <h2 className="text-base font-bold text-[#1E3A5F] mb-3">7. Data &amp; Privacy</h2>
           <p className="text-[15px] leading-relaxed text-foreground mb-3">
             Your use of the Service is also governed by our{" "}
-            <Link href="/privacy" replace className="text-[#1E3A5F] underline font-medium">Privacy Policy</Link>, which describes how we collect, use, store, and protect your personal information. Please review it carefully.
+            <Link href={crossLinkHref} replace className="text-[#1E3A5F] underline font-medium">Privacy Policy</Link>, which describes how we collect, use, store, and protect your personal information. Please review it carefully.
           </p>
           <p className="text-[15px] leading-relaxed text-foreground mb-3">
             User data is stored securely using industry-standard encryption and access controls. We never sell your personal data to third parties.
@@ -201,7 +215,7 @@ export default function TermsOfServicePage() {
           <h2 className="text-base font-bold text-[#1E3A5F] mb-3">14. Entire Agreement</h2>
           <p className="text-[15px] leading-relaxed text-foreground">
             These Terms, together with the{" "}
-            <Link href="/privacy" replace className="text-[#1E3A5F] underline font-medium">Privacy Policy</Link>, constitute the entire agreement between you and New Parapet LLC with respect to the Service and supersede all prior or contemporaneous understandings, communications, or agreements, whether written or oral.
+            <Link href={crossLinkHref} replace className="text-[#1E3A5F] underline font-medium">Privacy Policy</Link>, constitute the entire agreement between you and New Parapet LLC with respect to the Service and supersede all prior or contemporaneous understandings, communications, or agreements, whether written or oral.
           </p>
         </div>
 
@@ -224,6 +238,14 @@ export default function TermsOfServicePage() {
 
       <BottomNav />
     </div>
+  );
+}
+
+export default function TermsOfServicePage() {
+  return (
+    <Suspense fallback={<div className="max-w-[430px] mx-auto min-h-[100dvh] bg-[#FAFBFC]" />}>
+      <TermsOfServiceContent />
+    </Suspense>
   );
 }
 {/* LEGAL REVIEW REQUIRED BEFORE PUBLICATION */}

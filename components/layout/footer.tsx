@@ -18,8 +18,8 @@ export function Footer() {
           </div>
 
           <div className="flex gap-8 text-sm text-slate-500">
-            <Link href="/privacy" className="hover:text-navy transition-colors">Privacy Policy</Link>
-            <Link href="/terms" className="hover:text-navy transition-colors">Terms of Service</Link>
+            <Link href="/privacy?from=home" className="hover:text-navy transition-colors">Privacy Policy</Link>
+            <Link href="/terms?from=home" className="hover:text-navy transition-colors">Terms of Service</Link>
             <Link href="#" className="hover:text-navy transition-colors">Contact</Link>
           </div>
         </div>

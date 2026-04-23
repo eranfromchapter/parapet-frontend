@@ -556,7 +556,7 @@ export default function AccountPage() {
               </button>
             ))}
             <Link
-              href="/terms"
+              href="/terms?from=account"
               className="flex items-center gap-3 px-4 py-3.5 w-full hover:bg-gray-50 transition-colors"
             >
               <FileText size={18} className="text-[#64748B] flex-shrink-0" />
@@ -564,7 +564,7 @@ export default function AccountPage() {
               <ChevronRight size={16} className="text-[#64748B]" />
             </Link>
             <Link
-              href="/privacy"
+              href="/privacy?from=account"
               className="flex items-center gap-3 px-4 py-3.5 w-full hover:bg-gray-50 transition-colors"
             >
               <Shield size={18} className="text-[#64748B] flex-shrink-0" />
