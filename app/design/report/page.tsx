@@ -4,11 +4,13 @@ import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Monitor, Lightbulb, Tag, Link2, Diamond, Sun, DollarSign,
-  Wrench, Sparkles, Star, Shield, ChevronLeft,
+  Wrench, Sparkles, Star, Shield, ChevronLeft, Download, Loader2,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
+import { Button } from "@/components/ui/button";
 import { getAuthHeaders } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -27,11 +29,37 @@ function ReportContent() {
     ? "/documents"
     : `/design/results?session=${sessionId}`;
 
+  const { toast } = useToast();
   const [conceptData, setConceptData] = useState<any>(null);
   const [sessionData, setSessionData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState("");
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      const res = await fetch(`${API_URL}/v1/design/${sessionId}/pdf?concept=${conceptIndex}`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition");
+      const filenameMatch = disposition?.match(/filename="?([^";\n]+)"?/);
+      const filename = filenameMatch?.[1] || "PARAPET_Design_Report.pdf";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "PDF download failed", description: "Please try again in a moment.", variant: "destructive" });
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     if (!sessionId) return;
@@ -82,7 +110,17 @@ function ReportContent() {
 
   return (
     <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-[#FAFBFC] relative shadow-xl">
-      <PageHeader title={headerTitle} subtitle={headerSubtitle} backPath={backPath} />
+      <PageHeader
+        title={headerTitle}
+        subtitle={headerSubtitle}
+        backPath={backPath}
+        rightAction={
+          <Button variant="ghost" size="sm" className="text-xs gap-1.5" onClick={handleDownloadPdf} disabled={downloadingPdf}>
+            {downloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            {downloadingPdf ? "Downloading..." : "PDF"}
+          </Button>
+        }
+      />
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-4 pb-4 space-y-5">
 
