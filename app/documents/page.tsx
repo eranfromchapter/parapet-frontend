@@ -69,7 +69,7 @@ function getDocHref(doc: Document): string {
   // to /documents / "My Documents" instead of their default entry point.
   switch (doc.type) {
     case "report": return `/readiness/${doc.id}?from=vault`;
-    case "spatial": return "/capture?from=vault";
+    case "spatial": return `/capture/${doc.id}?from=vault`;
     case "walkthrough": return "/capture?from=vault";
     case "design": return `/design/results?session=${doc.id}&from=vault`;
     case "estimate": return `/estimate/${doc.id}?from=vault`;

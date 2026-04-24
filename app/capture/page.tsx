@@ -503,7 +503,7 @@ export default function SpaceCapturePage() {
                 {rooms.map((room: any, i: number) => (
                   <button
                     key={room.id ?? i}
-                    onClick={() => setToast("Room detail view coming soon")}
+                    onClick={() => router.push(`/capture/${spatialId}/room/${room.id}`)}
                     className="flex items-center gap-3 px-3.5 py-3 w-full text-left hover:bg-muted/30 transition-colors"
                   >
                     <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
