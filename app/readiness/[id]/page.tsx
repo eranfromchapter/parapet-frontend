@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   TrendingUp, Clock, DollarSign, AlertTriangle, CheckCircle2,
   Info, Download, ArrowRight, Target, Shield, ChevronLeft,
-  FileText, Users, ListChecks, AlertCircle, Loader2, Camera,
+  FileText, Users, ListChecks, AlertCircle, Loader2, Camera, Palette,
 } from "lucide-react";
 import ParapetLogo from "@/components/ParapetLogo";
 import BottomNav from "@/components/BottomNav";
@@ -95,6 +95,11 @@ export default function ReadinessReportPage() {
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const pollStartRef = useRef<number>(0);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Design Studio data — loaded independently after main report renders
+  const [designAttempted, setDesignAttempted] = useState(false);
+  const [designConcept, setDesignConcept] = useState<any>(null);
+  const [designReport, setDesignReport] = useState<any>(null);
 
   const handleDownloadPdf = async () => {
     setDownloadingPdf(true);
@@ -216,6 +221,67 @@ export default function ReadinessReportPage() {
     };
   }, [generating, fetchReport]);
 
+  // Non-blocking: fetch Design Studio data after main report is ready
+  useEffect(() => {
+    if (!report) return;
+
+    const projectId: string | undefined =
+      report.project_id ??
+      report.report_json?.project_id ??
+      report.form_data?.project_id ??
+      report.intake_data?.project_id;
+
+    if (!projectId) {
+      setDesignAttempted(true);
+      return;
+    }
+
+    const controller = new AbortController();
+    const apiBase = "/api/backend";
+
+    const run = async () => {
+      try {
+        const sessRes = await fetch(`${apiBase}/v1/design/sessions/${projectId}`, {
+          headers: getAuthHeaders(),
+          signal: controller.signal,
+        });
+        if (!sessRes.ok) return;
+
+        const sessData = await sessRes.json();
+        const sessions: any[] = Array.isArray(sessData)
+          ? sessData
+          : (sessData.sessions ?? []);
+
+        const firstWithConcepts = sessions.find(
+          (s: any) => (s.concepts?.length ?? 0) > 0
+        );
+        if (!firstWithConcepts) return;
+
+        const concept = firstWithConcepts.concepts[0];
+        const sessionId: string = firstWithConcepts.id ?? firstWithConcepts.session_id ?? "";
+        setDesignConcept({ ...concept, _sessionId: sessionId });
+
+        if (!sessionId) return;
+        const rptRes = await fetch(`${apiBase}/v1/design/${sessionId}/concept/0`, {
+          headers: getAuthHeaders(),
+          signal: controller.signal,
+        });
+        if (rptRes.ok) {
+          const rptData = await rptRes.json();
+          setDesignReport(rptData.report ?? rptData);
+        }
+      } catch (err) {
+        if ((err as any)?.name === "AbortError") return;
+        // silently degrade — CTA will show instead
+      } finally {
+        setDesignAttempted(true);
+      }
+    };
+
+    run();
+    return () => controller.abort();
+  }, [report]);
+
   if (loading) {
     return (
       <div className="max-w-[430px] mx-auto min-h-[100dvh] flex items-center justify-center bg-background shadow-xl">
@@ -311,6 +377,10 @@ export default function ReadinessReportPage() {
   const timelineWeeks = daysToWeeks(p50Days);
   const timelineRangeLow = daysToWeeks(p10Days);
   const timelineRangeHigh = daysToWeeks(p90Days);
+
+  // Design section derived
+  const reportMaterials: any[] = designReport?.material_recommendations ?? [];
+  const designBudget = designReport?.total_budget_estimate ?? null;
 
   const homeType = formData?.home_type ?? formData?.homeType ?? formData?.property_type ?? "Renovation";
   const scope: string[] = formData?.scope ?? formData?.renovation_scope ?? [];
@@ -524,6 +594,163 @@ export default function ReadinessReportPage() {
             <p className="text-[9px] text-muted-foreground/70 mt-2 italic">{sourceAttribution}</p>
           )}
         </Card>
+
+        {/* ── Design Selections ── */}
+        {!designAttempted ? (
+          <Card className="p-4 mb-4 rounded-xl border border-border/50">
+            <div className="flex items-center gap-2 mb-3">
+              <Palette size={14} className="text-[#2BCBBA]" />
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Design Selections</h3>
+            </div>
+            <div className="space-y-2 animate-pulse">
+              <div className="h-3 bg-muted rounded w-1/2" />
+              <div className="h-3 bg-muted rounded w-full" />
+              <div className="h-3 bg-muted rounded w-3/4" />
+            </div>
+          </Card>
+        ) : designConcept ? (
+          <Card className="p-4 mb-4 rounded-xl border border-border/50">
+            <div className="flex items-center gap-2 mb-3">
+              <Palette size={14} className="text-[#2BCBBA]" />
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Design Selections</h3>
+            </div>
+
+            {/* Concept name */}
+            <div className="mb-3">
+              <p className="text-sm font-bold text-foreground leading-tight">{designConcept.name}</p>
+              {designConcept.sub_style && (
+                <p className="text-[11px] text-muted-foreground mt-0.5">{designConcept.sub_style}</p>
+              )}
+            </div>
+
+            {/* Color palette */}
+            {(designConcept.palette?.length ?? 0) > 0 && (
+              <div className="mb-3 pt-3 border-t border-border/30">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Palette</p>
+                <div className="flex gap-2 flex-wrap">
+                  {designConcept.palette.map((hex: string, i: number) => (
+                    <div key={i} className="flex flex-col items-center gap-0.5">
+                      <div className="w-6 h-6 rounded-full border border-gray-200" style={{ backgroundColor: hex }} />
+                      <span className="text-[8px] text-muted-foreground font-mono">{hex}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Materials — full concept report */}
+            {reportMaterials.length > 0 && (
+              <div className="mb-3 pt-3 border-t border-border/30">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Materials & Finishes</p>
+                <div className="space-y-2">
+                  {reportMaterials.map((mat: any, i: number) => (
+                    <div key={i} className={`p-2.5 rounded-lg ${i % 2 === 0 ? "bg-muted/40" : ""}`}>
+                      <div className="flex items-start justify-between gap-2 mb-0.5">
+                        <p className="text-[11px] font-semibold text-foreground">{mat.category || mat.name}</p>
+                        {mat.cost_range && (
+                          <p className="text-[10px] font-medium text-muted-foreground shrink-0">
+                            {typeof mat.cost_range === "string"
+                              ? mat.cost_range
+                              : `$${(mat.cost_range.low ?? 0).toLocaleString()}–$${(mat.cost_range.high ?? 0).toLocaleString()}`}
+                          </p>
+                        )}
+                      </div>
+                      {mat.description && (
+                        <p className="text-[10px] text-muted-foreground leading-relaxed mb-1.5">{mat.description}</p>
+                      )}
+                      <div className="flex gap-1.5 flex-wrap">
+                        {mat.durability && (
+                          <span className="text-[9px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                            {mat.durability} durability
+                          </span>
+                        )}
+                        {mat.maintenance && (
+                          <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-full">
+                            {typeof mat.maintenance === "string"
+                              ? mat.maintenance
+                              : (mat.maintenance?.level ?? String(mat.maintenance))} maint.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Key materials fallback (session-level, no concept report yet) */}
+            {reportMaterials.length === 0 && (designConcept.key_materials?.length ?? 0) > 0 && (
+              <div className="mb-3 pt-3 border-t border-border/30">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Key Materials</p>
+                <ul className="space-y-1">
+                  {designConcept.key_materials.map((mat: string, i: number) => {
+                    const label = mat.includes(":")
+                      ? mat.split(":")[0].trim()
+                      : mat.includes("(")
+                      ? mat.split("(")[0].trim().replace(/,\s*$/, "")
+                      : mat.length > 40 ? mat.slice(0, 37) + "…" : mat;
+                    return (
+                      <li key={i} className="flex items-start gap-2 text-[11px] text-foreground leading-relaxed">
+                        <span className="text-[#2BCBBA] shrink-0 mt-0.5">&bull;</span>{label}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {/* Budget impact — side-by-side comparison when both exist */}
+            {(designBudget || designConcept.estimated_budget_impact) && (
+              <div className="pt-3 border-t border-border/30">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Budget Impact</p>
+                <div className={p50Cost != null ? "grid grid-cols-2 gap-2" : ""}>
+                  {p50Cost != null && (
+                    <div className="rounded-lg bg-muted/30 p-2.5">
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Base estimate</p>
+                      <p className="text-xs font-bold text-foreground">
+                        {formatCurrencyK(p10Cost)}{'–'}{formatCurrencyK(p90Cost)}
+                      </p>
+                    </div>
+                  )}
+                  <div className="rounded-lg bg-[#2BCBBA]/10 p-2.5">
+                    <p className="text-[10px] text-muted-foreground mb-0.5">With selected finishes</p>
+                    <p className="text-xs font-bold text-[#2BCBBA]">
+                      {(() => {
+                        const b = designBudget || designConcept.estimated_budget_impact;
+                        if (!b) return "—";
+                        if (typeof b === "string") return b;
+                        const lo = b.min ?? b.low;
+                        const hi = b.max ?? b.high;
+                        if (lo != null && hi != null) return `$${lo.toLocaleString()}–$${hi.toLocaleString()}`;
+                        if (b.range) return b.range;
+                        if (b.total != null) return `$${b.total.toLocaleString()}`;
+                        return "—";
+                      })()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
+        ) : (
+          <Card className="p-4 mb-4 rounded-xl border border-[#2BCBBA]/40 bg-[#2BCBBA]/[0.04]">
+            <div className="flex items-center gap-2 mb-2">
+              <Palette size={14} className="text-[#2BCBBA]" />
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#2BCBBA]">Explore Design Options</h3>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+              See how different styles and materials affect your budget
+            </p>
+            <Button
+              onClick={() => router.push("/design")}
+              size="sm"
+              className="w-full bg-[#2BCBBA] hover:bg-[#22a99a] text-white text-xs font-semibold gap-1.5"
+            >
+              <ArrowRight size={13} />
+              Explore Design Studio
+            </Button>
+          </Card>
+        )}
 
         {/* ── Scope Analysis ── */}
         {scopeAnalysis && (
