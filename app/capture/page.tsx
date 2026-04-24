@@ -487,10 +487,14 @@ export default function SpaceCapturePage() {
                 </div>
               )}
               {walkthroughId && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200/50">
-                  <CheckCircle2 size={14} className="text-emerald-500" />
-                  <span className="text-[11px] font-medium text-emerald-800">Video walkthrough uploaded</span>
-                </div>
+                <button
+                  onClick={() => router.push(`/walkthrough/${walkthroughId}`)}
+                  className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200/50 w-full text-left hover:bg-emerald-100/60 transition-colors"
+                >
+                  <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                  <span className="text-[11px] font-medium text-emerald-800 flex-1">Video walkthrough uploaded</span>
+                  <ChevronRight size={12} className="text-emerald-500 shrink-0" />
+                </button>
               )}
             </div>
           )}

@@ -70,7 +70,7 @@ function getDocHref(doc: Document): string {
   switch (doc.type) {
     case "report": return `/readiness/${doc.id}?from=vault`;
     case "spatial": return `/capture/${doc.id}?from=vault`;
-    case "walkthrough": return "/capture?from=vault";
+    case "walkthrough": return `/walkthrough/${doc.id}?from=vault`;
     case "design": return `/design/results?session=${doc.id}&from=vault`;
     case "estimate": return `/estimate/${doc.id}?from=vault`;
     default: return "#";
