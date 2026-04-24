@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import ParapetLogo from "@/components/ParapetLogo";
 import BottomNav from "@/components/BottomNav";
+import CollapsibleSection from "@/components/CollapsibleSection";
 import { getAuthHeaders } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 
@@ -501,8 +502,7 @@ export default function ReadinessReportPage() {
 
         {/* ── Timeline Scenarios ── */}
         {p50Days != null && (
-          <Card className="p-4 mb-4 rounded-xl border border-border/50">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Timeline Scenarios</h3>
+          <CollapsibleSection title="Timeline Scenarios" icon={Clock} defaultOpen={true}>
             <div className="space-y-2.5">
               {[
                 { label: "Best Case", days: p10Days, color: "bg-emerald-500", textColor: "text-emerald-600", pct: 20 },
@@ -524,13 +524,11 @@ export default function ReadinessReportPage() {
                 </div>
               ))}
             </div>
-          </Card>
+          </CollapsibleSection>
         )}
 
         {/* ── Cost Breakdown ── */}
-        <Card className="p-4 mb-4 rounded-xl border border-border/50">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Cost Breakdown</h3>
-
+        <CollapsibleSection title="Cost Breakdown" icon={DollarSign} defaultOpen={true}>
           {/* Total */}
           <div className="rounded-lg bg-[#1E3A5F]/5 p-2.5 mb-3">
             <div className="flex items-center justify-between">
@@ -593,27 +591,18 @@ export default function ReadinessReportPage() {
           {sourceAttribution && (
             <p className="text-[9px] text-muted-foreground/70 mt-2 italic">{sourceAttribution}</p>
           )}
-        </Card>
+        </CollapsibleSection>
 
         {/* ── Design Selections ── */}
-        {!designAttempted ? (
-          <Card className="p-4 mb-4 rounded-xl border border-border/50">
-            <div className="flex items-center gap-2 mb-3">
-              <Palette size={14} className="text-[#2BCBBA]" />
-              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Design Selections</h3>
-            </div>
+        <CollapsibleSection title="Design Selections" icon={Palette} defaultOpen={true}>
+          {!designAttempted ? (
             <div className="space-y-2 animate-pulse">
               <div className="h-3 bg-muted rounded w-1/2" />
               <div className="h-3 bg-muted rounded w-full" />
               <div className="h-3 bg-muted rounded w-3/4" />
             </div>
-          </Card>
-        ) : designConcept ? (
-          <Card className="p-4 mb-4 rounded-xl border border-border/50">
-            <div className="flex items-center gap-2 mb-3">
-              <Palette size={14} className="text-[#2BCBBA]" />
-              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Design Selections</h3>
-            </div>
+          ) : designConcept ? (
+            <div>
 
             {/* Concept name */}
             <div className="mb-3">
@@ -731,39 +720,38 @@ export default function ReadinessReportPage() {
                 </div>
               </div>
             )}
-          </Card>
-        ) : (
-          <Card className="p-4 mb-4 rounded-xl border border-[#2BCBBA]/40 bg-[#2BCBBA]/[0.04]">
-            <div className="flex items-center gap-2 mb-2">
-              <Palette size={14} className="text-[#2BCBBA]" />
-              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#2BCBBA]">Explore Design Options</h3>
             </div>
-            <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-              See how different styles and materials affect your budget
-            </p>
-            <Button
-              onClick={() => router.push("/design")}
-              size="sm"
-              className="w-full bg-[#2BCBBA] hover:bg-[#22a99a] text-white text-xs font-semibold gap-1.5"
-            >
-              <ArrowRight size={13} />
-              Explore Design Studio
-            </Button>
-          </Card>
-        )}
+          ) : (
+            <div className="rounded-xl border border-[#2BCBBA]/40 bg-[#2BCBBA]/[0.04] p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Palette size={14} className="text-[#2BCBBA]" />
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#2BCBBA]">Explore Design Options</h3>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                See how different styles and materials affect your budget
+              </p>
+              <Button
+                onClick={() => router.push("/design")}
+                size="sm"
+                className="w-full bg-[#2BCBBA] hover:bg-[#22a99a] text-white text-xs font-semibold gap-1.5"
+              >
+                <ArrowRight size={13} />
+                Explore Design Studio
+              </Button>
+            </div>
+          )}
+        </CollapsibleSection>
 
         {/* ── Scope Analysis ── */}
         {scopeAnalysis && (
-          <Card className="p-4 mb-4 rounded-xl border border-border/50">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Scope Analysis</h3>
+          <CollapsibleSection title="Scope Analysis" defaultOpen={false}>
             <p className="text-xs text-foreground leading-relaxed">{scopeAnalysis}</p>
-          </Card>
+          </CollapsibleSection>
         )}
 
         {/* ── Regulatory & Permits ── */}
         {(permitsRequired.length > 0 || regWarnings.length > 0 || coopApproval?.required) && (
-          <Card className="p-4 mb-4 rounded-xl border border-border/50">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Jurisdiction & Zoning Overview</h3>
+          <CollapsibleSection title="Regulatory & Permits" icon={Shield} defaultOpen={false}>
 
             {/* Property info */}
             {(propertyAddress || zipCode) && (
@@ -868,13 +856,12 @@ export default function ReadinessReportPage() {
                 </ul>
               </div>
             )}
-          </Card>
+          </CollapsibleSection>
         )}
 
         {/* ── Contractor Guidance / Delivery Model ── */}
         {(recommendedHires.length > 0 || vettingCriteria.length > 0 || redFlags.length > 0) && (
-          <Card className="p-4 mb-4 rounded-xl border border-border/50">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Contractor Guidance</h3>
+          <CollapsibleSection title="Contractor Guidance" icon={Users} defaultOpen={false}>
 
             {recommendedHires.length > 0 && (
               <div className="mb-3">
@@ -916,7 +903,7 @@ export default function ReadinessReportPage() {
                 </ul>
               </div>
             )}
-          </Card>
+          </CollapsibleSection>
         )}
 
         {/* ── AI Insight ── */}
@@ -950,8 +937,7 @@ export default function ReadinessReportPage() {
 
         {/* ── Provenance ── */}
         {(provenance?.pipeline_version || (provenance?.data_sources?.length ?? 0) > 0) && (
-          <Card className="p-4 mb-4 rounded-xl border border-border/50 bg-muted/20">
-            <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Data Provenance</h3>
+          <CollapsibleSection title="Data Provenance" defaultOpen={false} className="bg-muted/20">
             <div className="space-y-1 text-[10px] text-muted-foreground">
               {provenance.pipeline_version && <p>Pipeline: <span className="font-medium text-foreground">v{provenance.pipeline_version}</span></p>}
               {provenance.generated_at && <p>Generated: <span className="font-medium text-foreground">{new Date(provenance.generated_at).toLocaleString()}</span></p>}
@@ -979,7 +965,7 @@ export default function ReadinessReportPage() {
                 </div>
               )}
             </div>
-          </Card>
+          </CollapsibleSection>
         )}
 
         {/* ── Next Steps Nudge ── */}
