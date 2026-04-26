@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   ChevronLeft, Download, ArrowRight, DollarSign,
-  MessageSquare, FileText, ChevronDown, ChevronUp, FolderOpen,
+  MessageSquare, FileText, ChevronDown, ChevronUp, FolderOpen, Loader2,
 } from "lucide-react";
 import ParapetLogo from "@/components/ParapetLogo";
 import BottomNav from "@/components/BottomNav";
@@ -86,6 +86,39 @@ export default function EstimateViewPage() {
 
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const handleDownloadPdf = useCallback(async () => {
+    setDownloadingPdf(true);
+    try {
+      const res = await fetch(`${API_URL}/v1/estimates/${estimateId}/pdf`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) {
+        throw new Error(`Server responded ${res.status}`);
+      }
+      const blob = await res.blob();
+      // Try to extract filename from Content-Disposition; fall back to a sane default.
+      const cd = res.headers.get("Content-Disposition") || "";
+      const match = cd.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : `PARAPET-Estimate-${estimateId}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Defer revoke so Safari has time to start the download.
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      console.error("Estimate PDF download failed", err);
+      // Surface a minimal alert; richer toast plumbing can come later.
+      alert(`Could not download the estimate PDF. ${err instanceof Error ? err.message : ""}`);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }, [estimateId]);
 
   const loadEstimate = useCallback(async () => {
     setState({ kind: "loading" });
@@ -197,8 +230,15 @@ export default function EstimateViewPage() {
               <p className="text-[10px] text-muted-foreground mt-0.5">{headerSubtitle}</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" className="text-xs gap-1.5">
-            <Download size={14} /> Export
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs gap-1.5"
+            onClick={handleDownloadPdf}
+            disabled={downloadingPdf}
+          >
+            {downloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            {downloadingPdf ? "Downloading..." : "Export"}
           </Button>
         </div>
       </header>

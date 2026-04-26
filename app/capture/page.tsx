@@ -159,6 +159,12 @@ export default function SpaceCapturePage() {
   const [spatialId, setSpatialId] = useState<string | null>(null);
   const [walkthroughId, setWalkthroughId] = useState<string | null>(null);
   const [rooms, setRooms] = useState<any[]>([]);
+  // Authoritative total from the Polycam-parsed PropertyOverview. Populated
+  // on upload so the Space Capture page surfaces total sqft alongside the
+  // captured-rooms list, not only on the scan-detail page. Day 44 user-test
+  // feedback: "the report does not show the total square footage of the
+  // scanned space."
+  const [totalSqft, setTotalSqft] = useState<number>(0);
   const [photos, setPhotos] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
@@ -241,6 +247,16 @@ export default function SpaceCapturePage() {
           setSpatialId(sid);
           setRooms(parsedRooms);
           try { localStorage.setItem("parapet_spatial_id", sid); } catch {}
+          // Prefer the parser-reported total from PropertyOverview; fall back
+          // to a per-room sum so the banner still renders if the field is
+          // missing.
+          const totalFromOverview = data?.property_overview?.total_livable_floor_area_sf;
+          const totalFromRooms = parsedRooms.reduce(
+            (sum: number, r: any) =>
+              sum + (r.floor_area_sf ?? r.floor_area_sqft ?? r.overview?.floor_area_sf ?? 0),
+            0,
+          );
+          setTotalSqft(totalFromOverview && totalFromOverview > 0 ? totalFromOverview : totalFromRooms);
           setToast(`LiDAR scan uploaded \u2014 ${parsedRooms.length} room${parsedRooms.length > 1 ? "s" : ""} detected!`);
         }
       } else if (["mp4", "mov", "webm"].includes(ext)) {
@@ -496,6 +512,26 @@ export default function SpaceCapturePage() {
                   <ChevronRight size={12} className="text-emerald-500 shrink-0" />
                 </button>
               )}
+            </div>
+          )}
+
+          {/* ── Scan Summary (total sqft) ── */}
+          {rooms.length > 0 && totalSqft > 0 && (
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-[#1E3A5F]/5 p-3 border border-[#1E3A5F]/10">
+                <p className="text-[10px] text-muted-foreground mb-0.5">Total square footage</p>
+                <p className="text-lg font-bold text-foreground">
+                  {Math.round(totalSqft).toLocaleString()}
+                  <span className="text-xs font-normal text-muted-foreground ml-1">sq ft</span>
+                </p>
+              </div>
+              <div className="rounded-xl bg-[#2BCBBA]/8 p-3 border border-[#2BCBBA]/15">
+                <p className="text-[10px] text-muted-foreground mb-0.5">Rooms scanned</p>
+                <p className="text-lg font-bold text-foreground">
+                  {rooms.length}
+                  <span className="text-xs font-normal text-muted-foreground ml-1">{rooms.length === 1 ? "room" : "rooms"}</span>
+                </p>
+              </div>
             </div>
           )}
 

@@ -13,6 +13,30 @@ import { getAuthHeaders } from "@/lib/auth";
 
 const API_URL = "/api/backend";
 
+// The Polycam parser writes per-room measurements to two places:
+//   * room.overview.* — RoomOverview (dimensions_bounding, dimensions_inscribed,
+//     floor_area_sf, perimeter_ft, ceiling_height, room_volume_cf, etc).
+//   * top-level Room.* — duplicate measurement fields (floor_area_sf,
+//     wall_area_sf, perimeter_lf, etc) populated by the estimation engine.
+// We accept both naming patterns plus the legacy `floor_area_sqft` so the
+// page works regardless of which serialization path the backend used.
+interface CeilingHeight {
+  min_ft?: number;
+  max_ft?: number;
+  is_approx?: boolean;
+}
+
+interface RoomOverview {
+  floor_area_sf?: number;
+  wall_area_incl_openings_sf?: number;
+  wall_area_excl_openings_sf?: number;
+  perimeter_ft?: number;
+  ceiling_height?: CeilingHeight | null;
+  room_volume_cf?: number;
+  dimensions_bounding?: string;
+  dimensions_inscribed?: string;
+}
+
 interface Room {
   id: string;
   room_type?: string;
@@ -20,7 +44,41 @@ interface Room {
   photo_count?: number;
   dimensions?: string;
   floor_area_sqft?: number;
+  floor_area_sf?: number;
+  wall_area_sf?: number;
+  perimeter_lf?: number;
+  overview?: RoomOverview;
   features?: string;
+}
+
+function roomFloorArea(r: Room | null): number {
+  if (!r) return 0;
+  return r.floor_area_sf ?? r.floor_area_sqft ?? r.overview?.floor_area_sf ?? 0;
+}
+function roomWallArea(r: Room | null): number {
+  if (!r) return 0;
+  return (
+    r.wall_area_sf ??
+    r.overview?.wall_area_excl_openings_sf ??
+    r.overview?.wall_area_incl_openings_sf ??
+    0
+  );
+}
+function roomPerimeter(r: Room | null): number {
+  if (!r) return 0;
+  return r.perimeter_lf ?? r.overview?.perimeter_ft ?? 0;
+}
+function roomVolume(r: Room | null): number {
+  if (!r) return 0;
+  return r.overview?.room_volume_cf ?? 0;
+}
+function formatCeilingHeight(c: CeilingHeight | null | undefined): string | null {
+  if (!c || c.min_ft == null) return null;
+  const min = c.min_ft.toFixed(1);
+  if (c.max_ft != null && c.max_ft > c.min_ft) {
+    return `${min}–${c.max_ft.toFixed(1)} ft`;
+  }
+  return `${min} ft${c.is_approx ? " (approx)" : ""}`;
 }
 
 export default function RoomDetailPage() {
@@ -118,29 +176,90 @@ export default function RoomDetailPage() {
         )}
 
         {/* ── Dimensions Card ── */}
-        <Card className="p-4 rounded-xl border border-border/50">
-          <div className="flex items-center gap-2 mb-3">
-            <Ruler size={14} className="text-[#1E3A5F]" />
-            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Dimensions</h3>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {room.dimensions && (
-              <div className="rounded-lg bg-[#1E3A5F]/5 p-3">
-                <p className="text-[10px] text-muted-foreground mb-1">Floor plan</p>
-                <p className="text-base font-bold text-foreground">{room.dimensions}</p>
+        {(() => {
+          const floorArea = roomFloorArea(room);
+          const wallArea = roomWallArea(room);
+          const perimeter = roomPerimeter(room);
+          const volume = roomVolume(room);
+          const ceilingLabel = formatCeilingHeight(room.overview?.ceiling_height);
+          const dimsBounding = room.overview?.dimensions_bounding ?? room.dimensions ?? null;
+          const dimsInscribed = room.overview?.dimensions_inscribed ?? null;
+          const hasAny =
+            floorArea > 0 || wallArea > 0 || perimeter > 0 || volume > 0 ||
+            ceilingLabel || dimsBounding || dimsInscribed;
+
+          if (!hasAny) return null;
+
+          return (
+            <Card className="p-4 rounded-xl border border-border/50">
+              <div className="flex items-center gap-2 mb-3">
+                <Ruler size={14} className="text-[#1E3A5F]" />
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Dimensions</h3>
               </div>
-            )}
-            {room.floor_area_sqft != null && room.floor_area_sqft > 0 && (
-              <div className="rounded-lg bg-[#2BCBBA]/8 p-3">
-                <p className="text-[10px] text-muted-foreground mb-1">Floor area</p>
-                <p className="text-base font-bold text-foreground">
-                  {Math.round(room.floor_area_sqft).toLocaleString()}
-                  <span className="text-xs font-normal text-muted-foreground ml-1">sq ft</span>
-                </p>
+
+              {/* Primary tiles: floor area + dimensions */}
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                {dimsBounding && (
+                  <div className="rounded-lg bg-[#1E3A5F]/5 p-3 col-span-2">
+                    <p className="text-[10px] text-muted-foreground mb-1">Floor plan (bounding)</p>
+                    <p className="text-base font-bold text-foreground">{dimsBounding}</p>
+                    {dimsInscribed && (
+                      <p className="text-[10px] text-muted-foreground/80 mt-1">Inscribed: {dimsInscribed}</p>
+                    )}
+                  </div>
+                )}
+                {floorArea > 0 && (
+                  <div className="rounded-lg bg-[#2BCBBA]/8 p-3">
+                    <p className="text-[10px] text-muted-foreground mb-1">Floor area</p>
+                    <p className="text-base font-bold text-foreground">
+                      {Math.round(floorArea).toLocaleString()}
+                      <span className="text-xs font-normal text-muted-foreground ml-1">sq ft</span>
+                    </p>
+                  </div>
+                )}
+                {wallArea > 0 && (
+                  <div className="rounded-lg bg-[#1E3A5F]/5 p-3">
+                    <p className="text-[10px] text-muted-foreground mb-1">Wall area</p>
+                    <p className="text-base font-bold text-foreground">
+                      {Math.round(wallArea).toLocaleString()}
+                      <span className="text-xs font-normal text-muted-foreground ml-1">sq ft</span>
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </Card>
+
+              {/* Secondary row: perimeter + ceiling + volume */}
+              {(perimeter > 0 || ceilingLabel || volume > 0) && (
+                <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border/30">
+                  {perimeter > 0 && (
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Perimeter</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {perimeter.toFixed(1)}
+                        <span className="text-[10px] font-normal text-muted-foreground ml-1">ft</span>
+                      </p>
+                    </div>
+                  )}
+                  {ceilingLabel && (
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Ceiling</p>
+                      <p className="text-sm font-semibold text-foreground">{ceilingLabel}</p>
+                    </div>
+                  )}
+                  {volume > 0 && (
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Volume</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {Math.round(volume).toLocaleString()}
+                        <span className="text-[10px] font-normal text-muted-foreground ml-1">cu ft</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+          );
+        })()}
 
         {/* ── Features Card ── */}
         {featureList.length > 0 && (

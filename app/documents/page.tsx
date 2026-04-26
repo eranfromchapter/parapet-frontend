@@ -28,6 +28,10 @@ interface Document {
   icon: string;
   actions: string[];
   total_estimate?: number;
+  // Backend (Day 44 archive-on-supersede) flips this to true on every
+  // prior estimate when a new one lands. The vault still shows them so
+  // history is recoverable, but they render muted.
+  archived?: boolean;
 }
 
 interface Stats {
@@ -221,26 +225,39 @@ export default function DocumentVaultPage() {
             const st = STATUS_STYLES[doc.status] ?? STATUS_STYLES.uploaded;
             const subtitle = getDocSubtitle(doc);
 
+            const archived = !!doc.archived;
             return (
               <Link key={doc.id} href={getDocHref(doc)}>
-                <div className="bg-white rounded-xl border border-border/50 p-3.5 flex items-center gap-3 hover:border-[#1E3A5F]/30 transition-colors overflow-hidden">
-                  <div className="w-10 h-10 rounded-lg bg-[#1E3A5F]/5 flex items-center justify-center shrink-0">
-                    <Icon size={18} className="text-[#1E3A5F]" />
+                <div className={`bg-white rounded-xl border p-3.5 flex items-center gap-3 transition-colors overflow-hidden ${
+                  archived
+                    ? "border-border/30 opacity-70 hover:border-border/60"
+                    : "border-border/50 hover:border-[#1E3A5F]/30"
+                }`}>
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                    archived ? "bg-muted/40" : "bg-[#1E3A5F]/5"
+                  }`}>
+                    <Icon size={18} className={archived ? "text-muted-foreground" : "text-[#1E3A5F]"} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{doc.title}</p>
+                    <p className={`text-sm font-semibold truncate ${archived ? "text-muted-foreground" : "text-foreground"}`}>{doc.title}</p>
                     {subtitle && (
                       <p className="text-[11px] text-muted-foreground truncate">{subtitle}</p>
                     )}
                     <div className="flex items-center gap-2 mt-1">
-                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${st.bg} ${st.text}`}>
-                        {doc.status === "processing" && <Loader2 size={8} className="animate-spin" />}
-                        {st.label}
-                      </span>
+                      {archived ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-muted/50 text-muted-foreground">
+                          Archived
+                        </span>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${st.bg} ${st.text}`}>
+                          {doc.status === "processing" && <Loader2 size={8} className="animate-spin" />}
+                          {st.label}
+                        </span>
+                      )}
                       <span className="text-[10px] text-muted-foreground/60">{timeAgo(doc.created_at)}</span>
                     </div>
                   </div>
-                  <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+                  <ChevronRight size={16} className={archived ? "text-muted-foreground/40 shrink-0" : "text-muted-foreground shrink-0"} />
                 </div>
               </Link>
             );
