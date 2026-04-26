@@ -73,9 +73,16 @@ export default function EstimateViewPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const estimateId = params.id as string;
-  const fromVault = searchParams.get("from") === "vault";
-  const headerTitle = fromVault ? "My Documents" : "Your Estimate";
-  const headerSubtitle = fromVault ? "Back to Document Vault" : "Spatial-based line item estimate";
+  const fromParam = searchParams.get("from");
+  const fromVault = fromParam === "vault";
+  const fromAlerts = fromParam === "alerts";
+  const backPath = fromAlerts ? "/notifications" : fromVault ? "/documents" : "/dashboard";
+  const headerTitle = fromAlerts ? "Alerts" : fromVault ? "My Documents" : "Your Estimate";
+  const headerSubtitle = fromAlerts
+    ? "Back to Alerts"
+    : fromVault
+    ? "Back to Document Vault"
+    : "Spatial-based line item estimate";
 
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
@@ -182,7 +189,7 @@ export default function EstimateViewPage() {
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/40">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <button onClick={() => router.push("/documents")} className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors">
+            <button onClick={() => router.push(backPath)} className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors">
               <ChevronLeft size={22} className="text-foreground" />
             </button>
             <div>

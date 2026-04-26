@@ -72,12 +72,16 @@ function categoryOf(type: string | undefined): Category {
   return null;
 }
 
+// All routes from the alerts/notifications page tag the destination with
+// ?from=alerts so the receiving page's back arrow returns the user to
+// /notifications instead of the page's default entry point. Same pattern
+// the document vault uses with from=vault.
 function urlForCategory(cat: Category, id: string): string {
   switch (cat) {
-    case "readiness": return `/readiness/${id}`;
-    case "estimate": return `/estimate/${id}`;
-    case "design": return `/design/results?session=${id}`;
-    case "spatial": return "/capture";
+    case "readiness": return `/readiness/${id}?from=alerts`;
+    case "estimate": return `/estimate/${id}?from=alerts`;
+    case "design": return `/design/results?session=${id}&from=alerts`;
+    case "spatial": return id ? `/capture/${id}?from=alerts` : "/capture?from=alerts";
     default: return "/dashboard";
   }
 }

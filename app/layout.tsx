@@ -81,6 +81,11 @@ export const viewport: Viewport = {
   themeColor: "#1E3A5F",
   width: "device-width",
   initialScale: 1,
+  // Fills the entire screen on notched iPhones (XS+) so env(safe-area-inset-*)
+  // resolves to the actual hardware insets instead of 0. Without this, the
+  // BottomNav's pb-[max(8px,env(safe-area-inset-bottom))] silently collapses
+  // to 8px and the home indicator overlaps the active tab icon.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

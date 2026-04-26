@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   ArrowRight, ChevronDown, ChevronUp, ScanLine, Video,
-  AlertTriangle, CheckCircle2, Clock,
+  AlertTriangle, CheckCircle2, Clock, Loader2,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
@@ -18,9 +18,24 @@ import { getAuthHeaders } from "@/lib/auth";
 const API_URL = "/api/backend";
 const TRANSCRIPT_PREVIEW_LENGTH = 300;
 
+// All walkthrough statuses the backend can emit. Keep in sync with
+// services/walkthrough/models.py and services/api/routers/walkthrough.py.
+// The exhaustive Record<WalkthroughStatus, ...> below will fail to compile
+// if a new status is added without a STATUS_CONFIG entry.
+type WalkthroughStatus =
+  | "uploaded"
+  | "processing"
+  | "transcribed"
+  | "ready_for_analysis"
+  | "transcription_failed"
+  | "analyzing"
+  | "analyzed"
+  | "analysis_failed"
+  | "confirmed";
+
 interface WalkthroughData {
   id: string;
-  status: "uploaded" | "transcribed" | "analyzed" | "analysis_failed" | string;
+  status: WalkthroughStatus | string;
   spatial_id?: string;
   transcript?: string;
   analysis?: Record<string, any>;
@@ -28,27 +43,49 @@ interface WalkthroughData {
   estimate_id?: string;
   estimate?: { id?: string };
   created_at?: string;
+  // Backend (Day 44 fix) sets `video_url` to a backend-relative streaming
+  // path when the original upload is still on disk. `has_video` is a
+  // convenience flag.
+  video_url?: string;
+  has_video?: boolean;
 }
 
 // ── Status badge ──
 
-const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
-  uploaded:         { bg: "bg-amber-100",          text: "text-amber-800",    label: "Processing" },
-  transcribed:      { bg: "bg-[#2BCBBA]/15",        text: "text-[#1E8A7E]",   label: "Transcribed" },
-  analyzed:         { bg: "bg-emerald-100",         text: "text-emerald-800", label: "Analysis Complete" },
-  analysis_failed:  { bg: "bg-red-100",             text: "text-red-700",     label: "Analysis Failed" },
+type StatusConfigEntry = {
+  bg: string;
+  text: string;
+  label: string;
+  icon: typeof Clock;
+};
+
+const STATUS_CONFIG: Record<WalkthroughStatus, StatusConfigEntry> = {
+  uploaded:             { bg: "bg-amber-100",         text: "text-amber-800",    label: "Processing",       icon: Clock },
+  processing:           { bg: "bg-amber-100",         text: "text-amber-800",    label: "Processing",       icon: Loader2 },
+  transcribed:          { bg: "bg-[#2BCBBA]/15",      text: "text-[#1E8A7E]",    label: "Transcribed",      icon: CheckCircle2 },
+  ready_for_analysis:   { bg: "bg-amber-100",         text: "text-amber-800",    label: "Preparing analysis…", icon: Loader2 },
+  transcription_failed: { bg: "bg-red-100",           text: "text-red-700",      label: "Transcription failed", icon: AlertTriangle },
+  analyzing:            { bg: "bg-amber-100",         text: "text-amber-800",    label: "Analyzing…",       icon: Loader2 },
+  analyzed:             { bg: "bg-emerald-100",       text: "text-emerald-800",  label: "Analysis complete", icon: CheckCircle2 },
+  analysis_failed:      { bg: "bg-red-100",           text: "text-red-700",      label: "Analysis failed",  icon: AlertTriangle },
+  confirmed:            { bg: "bg-emerald-100",       text: "text-emerald-800",  label: "Confirmed",        icon: CheckCircle2 },
+};
+
+const FALLBACK_STATUS_CONFIG: StatusConfigEntry = {
+  bg: "bg-gray-100",
+  text: "text-gray-600",
+  label: "Processing",
+  icon: Loader2,
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] ?? { bg: "bg-gray-100", text: "text-gray-600", label: status };
-  const Icon =
-    status === "uploaded"        ? Clock :
-    status === "transcribed"     ? CheckCircle2 :
-    status === "analyzed"        ? CheckCircle2 :
-    status === "analysis_failed" ? AlertTriangle : Video;
+  const cfg = (STATUS_CONFIG as Record<string, StatusConfigEntry>)[status] ?? FALLBACK_STATUS_CONFIG;
+  const Icon = cfg.icon;
+  // Spinner animation for in-progress states
+  const isAnimated = ["processing", "ready_for_analysis", "analyzing"].includes(status);
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${cfg.bg} ${cfg.text}`}>
-      <Icon size={11} />
+      <Icon size={11} className={isAnimated ? "animate-spin" : ""} />
       {cfg.label}
     </span>
   );
@@ -235,6 +272,22 @@ export default function WalkthroughDetailPage() {
             </p>
           )}
         </Card>
+
+        {/* ── Original Video Player ── */}
+        {data.has_video && data.video_url && (
+          <Card className="p-4 rounded-xl border border-border/50">
+            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">Original Walkthrough Video</h3>
+            <video
+              src={`${API_URL}${data.video_url}`}
+              controls
+              playsInline
+              preload="metadata"
+              className="w-full rounded-lg bg-black"
+            >
+              Your browser does not support inline video playback.
+            </video>
+          </Card>
+        )}
 
         {/* ── Transcript ── */}
         <Card className="p-4 rounded-xl border border-border/50">

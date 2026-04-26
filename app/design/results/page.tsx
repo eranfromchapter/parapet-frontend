@@ -16,8 +16,10 @@ function ResultsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session");
-  const fromVault = searchParams.get("from") === "vault";
-  const backPath = fromVault ? "/documents" : "/design";
+  const fromParam = searchParams.get("from");
+  const fromVault = fromParam === "vault";
+  const fromAlerts = fromParam === "alerts";
+  const backPath = fromAlerts ? "/notifications" : fromVault ? "/documents" : "/design";
 
   const [session, setSession] = useState<any>(null);
   const [activeTab, setActiveTab] = useState(0);
@@ -213,7 +215,10 @@ function ResultsContent() {
 
             {/* View Report Button */}
             <button
-              onClick={() => router.push(`/design/report?session=${sessionId}&concept=${activeTab}${fromVault ? "&from=vault" : ""}`)}
+              onClick={() => {
+                const fromQs = fromAlerts ? "&from=alerts" : fromVault ? "&from=vault" : "";
+                router.push(`/design/report?session=${sessionId}&concept=${activeTab}${fromQs}`);
+              }}
               className="w-full bg-[#1E3A5F] text-white rounded-xl py-3.5 text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-[#1E3A5F]/20"
             >
               View Design Report

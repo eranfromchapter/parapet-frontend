@@ -94,8 +94,21 @@ export default function ReadinessReportPage() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  // Back-nav target — defaults to Document Vault, but ?from=alerts routes
+  // back to /notifications, ?from=dashboard routes to /dashboard. Same
+  // pattern the spatial scan and walkthrough viewer pages use.
+  const [backPath, setBackPath] = useState<string>("/documents");
   const pollStartRef = useRef<number>(0);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const from = new URLSearchParams(window.location.search).get("from");
+      if (from === "alerts") setBackPath("/notifications");
+      else if (from === "dashboard") setBackPath("/dashboard");
+      else if (from === "vault") setBackPath("/documents");
+    }
+  }, []);
 
   // Design Studio data — loaded independently after main report renders
   const [designAttempted, setDesignAttempted] = useState(false);
@@ -397,7 +410,7 @@ export default function ReadinessReportPage() {
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/40">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <button onClick={() => router.push("/documents")} className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors">
+            <button onClick={() => router.push(backPath)} className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors">
               <ChevronLeft size={22} className="text-foreground" />
             </button>
             <div>

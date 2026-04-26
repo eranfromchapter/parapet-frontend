@@ -22,8 +22,17 @@ interface Room {
   name?: string;
   photo_count?: number;
   dimensions?: string;
+  // Backend names this field `floor_area_sf` (Polycam-derived, square feet).
+  // Some legacy records / clients send `floor_area_sqft`. Read both.
   floor_area_sqft?: number;
+  floor_area_sf?: number;
+  overview?: { floor_area_sf?: number };
   features?: string;
+}
+
+interface PropertyOverview {
+  total_livable_floor_area_sf?: number;
+  total_exterior_floor_area_sf?: number;
 }
 
 interface SpatialModel {
@@ -31,8 +40,18 @@ interface SpatialModel {
   spatial_id?: string;
   created_at?: string;
   rooms?: Room[];
+  property_overview?: PropertyOverview;
   estimate_id?: string;
   estimate?: { id?: string };
+}
+
+function roomFloorArea(r: Room): number {
+  return (
+    r.floor_area_sf ??
+    r.floor_area_sqft ??
+    r.overview?.floor_area_sf ??
+    0
+  );
 }
 
 function SkeletonRow() {
@@ -62,6 +81,7 @@ export default function SpatialScanDetailPage() {
     if (typeof window !== "undefined") {
       const from = new URLSearchParams(window.location.search).get("from");
       if (from === "vault") setBackPath("/documents");
+      else if (from === "alerts") setBackPath("/notifications");
     }
   }, []);
 
@@ -88,7 +108,17 @@ export default function SpatialScanDetailPage() {
   }, [spatialId]);
 
   const rooms: Room[] = spatial?.rooms ?? [];
-  const totalSqft = rooms.reduce((sum, r) => sum + (r.floor_area_sqft ?? 0), 0);
+  // Prefer the parser-reported total (authoritative) over per-room sum,
+  // which can be 0 when room-level area is unpopulated. Eran's Day 44 test
+  // surfaced this — backend was reporting total_livable_floor_area_sf
+  // correctly but the frontend wasn't reading it, so the spatial report
+  // showed no total square footage.
+  const totalSqft = (() => {
+    const fromOverview = spatial?.property_overview?.total_livable_floor_area_sf;
+    if (fromOverview && fromOverview > 0) return fromOverview;
+    const summed = rooms.reduce((sum, r) => sum + roomFloorArea(r), 0);
+    return summed;
+  })();
   const existingEstimateId = spatial?.estimate_id || spatial?.estimate?.id;
 
   if (loading) {
@@ -183,11 +213,19 @@ export default function SpatialScanDetailPage() {
               {rooms.map((room, i) => {
                 const roomName = room.name ?? room.room_type ?? `Room ${i + 1}`;
                 const showTypeBadge = room.room_type && room.room_type !== room.name && room.name;
+                // Backend now stamps an id on every Room (Day 44 fix). For
+                // safety against legacy or partially-backfilled records,
+                // disable navigation when the id is missing rather than
+                // routing the user to /room/undefined.
+                const navigable = Boolean(room.id);
                 return (
                   <button
-                    key={room.id ?? i}
-                    onClick={() => router.push(`/capture/${spatialId}/room/${room.id}`)}
-                    className="flex items-center gap-3 px-3.5 py-3.5 w-full text-left hover:bg-muted/30 transition-colors"
+                    key={room.id ?? `idx-${i}-${roomName}`}
+                    onClick={navigable ? () => router.push(`/capture/${spatialId}/room/${room.id}`) : undefined}
+                    disabled={!navigable}
+                    className={`flex items-center gap-3 px-3.5 py-3.5 w-full text-left transition-colors ${
+                      navigable ? "hover:bg-muted/30" : "opacity-60 cursor-not-allowed"
+                    }`}
                   >
                     <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
                       <CheckCircle2 size={15} className="text-emerald-600" />
@@ -203,10 +241,10 @@ export default function SpatialScanDetailPage() {
                       </div>
                       <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                         {room.dimensions && <span>{room.dimensions}</span>}
-                        {room.floor_area_sqft != null && room.floor_area_sqft > 0 && (
+                        {roomFloorArea(room) > 0 && (
                           <>
                             {room.dimensions && <span>&middot;</span>}
-                            <span>{Math.round(room.floor_area_sqft)} sq ft</span>
+                            <span>{Math.round(roomFloorArea(room))} sq ft</span>
                           </>
                         )}
                       </div>
