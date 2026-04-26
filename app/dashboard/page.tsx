@@ -152,10 +152,13 @@ export default function DashboardPage() {
           <span className="text-base font-bold text-[#1E3A5F] tracking-tight">PARAPET</span>
         </div>
         <div className="flex items-center gap-3">
-          <button className="relative p-1">
+          {/* Day 44 round-3: previously this bell was a non-interactive
+              <button> with no onClick — duplicating the BottomNav alerts
+              icon. Now it links to /notifications so both surfaces work. */}
+          <Link href="/notifications" className="relative p-1" aria-label="Alerts">
             <Bell size={20} className="text-muted-foreground" />
             <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-red-500" />
-          </button>
+          </Link>
           <Link href="/account" className="w-8 h-8 rounded-full bg-[#1E3A5F] flex items-center justify-center">
             {userInitials ? (
               <span className="text-[11px] font-bold text-white">{userInitials}</span>
@@ -334,16 +337,22 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* ── Alert Banner ── */}
+        {/* ── Alert Banner ── deep-links to the readiness report's
+             Regulatory & Permits section. Day 44 round-3: previously a
+             non-interactive div with hardcoded "2 items flagged" copy.
+             Now navigates to the actual report so the user can review. */}
         {hasReport && (
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200/50 mb-5">
+          <Link
+            href={`/readiness/${reportId}?from=dashboard#regulatory`}
+            className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200/50 mb-5 hover:bg-amber-100/60 transition-colors"
+          >
             <AlertTriangle size={16} className="text-amber-500 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-amber-800">2 items flagged</p>
+              <p className="text-xs font-semibold text-amber-800">Items to review</p>
               <p className="text-[10px] text-amber-700">Review permit requirements and co-op approval status</p>
             </div>
             <ChevronRight size={14} className="text-amber-500 flex-shrink-0" />
-          </div>
+          </Link>
         )}
 
         {/* ── Phase Modules ── */}

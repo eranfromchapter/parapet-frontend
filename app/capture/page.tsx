@@ -252,8 +252,12 @@ export default function SpaceCapturePage() {
           // missing.
           const totalFromOverview = data?.property_overview?.total_livable_floor_area_sf;
           const totalFromRooms = parsedRooms.reduce(
+            // Use `||` not `??` — the top-level Room.floor_area_sf is an
+            // estimation-engine field that defaults to 0.0; only
+            // overview.floor_area_sf is parser-authoritative. With `??`,
+            // 0 wouldn't fall through and the sum would always be 0.
             (sum: number, r: any) =>
-              sum + (r.floor_area_sf ?? r.floor_area_sqft ?? r.overview?.floor_area_sf ?? 0),
+              sum + (r.overview?.floor_area_sf || r.floor_area_sf || r.floor_area_sqft || 0),
             0,
           );
           setTotalSqft(totalFromOverview && totalFromOverview > 0 ? totalFromOverview : totalFromRooms);

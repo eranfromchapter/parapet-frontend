@@ -51,26 +51,40 @@ interface Room {
   features?: string;
 }
 
+// IMPORTANT: read overview.* FIRST and use `||` (not `??`). The Pydantic
+// Room model sets `floor_area_sf: float = 0.0` (and likewise for wall/
+// perimeter) at the top level — those are "Estimation engine fields"
+// populated only when an estimate has been generated. The Polycam parser
+// writes the authoritative measurements to `room.overview.*`. When a scan
+// hasn't gone through the estimation engine, `r.floor_area_sf === 0`, and
+// `??` would NOT fall through to `overview` (since 0 isn't nullish). Day 44
+// round-2 shipped this with `??` and silently rendered an empty card — fix
+// is to prefer the parser fields and treat 0 as "missing" via `||`.
 function roomFloorArea(r: Room | null): number {
   if (!r) return 0;
-  return r.floor_area_sf ?? r.floor_area_sqft ?? r.overview?.floor_area_sf ?? 0;
+  return (
+    r.overview?.floor_area_sf ||
+    r.floor_area_sf ||
+    r.floor_area_sqft ||
+    0
+  );
 }
 function roomWallArea(r: Room | null): number {
   if (!r) return 0;
   return (
-    r.wall_area_sf ??
-    r.overview?.wall_area_excl_openings_sf ??
-    r.overview?.wall_area_incl_openings_sf ??
+    r.overview?.wall_area_excl_openings_sf ||
+    r.overview?.wall_area_incl_openings_sf ||
+    r.wall_area_sf ||
     0
   );
 }
 function roomPerimeter(r: Room | null): number {
   if (!r) return 0;
-  return r.perimeter_lf ?? r.overview?.perimeter_ft ?? 0;
+  return r.overview?.perimeter_ft || r.perimeter_lf || 0;
 }
 function roomVolume(r: Room | null): number {
   if (!r) return 0;
-  return r.overview?.room_volume_cf ?? 0;
+  return r.overview?.room_volume_cf || 0;
 }
 function formatCeilingHeight(c: CeilingHeight | null | undefined): string | null {
   if (!c || c.min_ft == null) return null;

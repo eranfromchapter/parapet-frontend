@@ -45,11 +45,15 @@ interface SpatialModel {
   estimate?: { id?: string };
 }
 
+// Read parser-authoritative `overview.floor_area_sf` first and use `||`
+// (not `??`). Top-level `floor_area_sf` defaults to 0.0 — it's populated
+// only by the estimation engine, not the parser — so `??` would never fall
+// through. Same pattern fix as in the room-detail page.
 function roomFloorArea(r: Room): number {
   return (
-    r.floor_area_sf ??
-    r.floor_area_sqft ??
-    r.overview?.floor_area_sf ??
+    r.overview?.floor_area_sf ||
+    r.floor_area_sf ||
+    r.floor_area_sqft ||
     0
   );
 }

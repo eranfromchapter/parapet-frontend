@@ -22,12 +22,31 @@ function ReportContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session");
   const conceptIndex = searchParams.get("concept") || "0";
-  const fromVault = searchParams.get("from") === "vault";
-  const headerTitle = fromVault ? "My Documents" : "Design Report";
-  const headerSubtitle = fromVault ? "Back to Document Vault" : "Your Design Journey with PARAPET";
-  const backPath = fromVault
+  const fromParam = searchParams.get("from");
+  const fromVault = fromParam === "vault";
+  const fromAlerts = fromParam === "alerts";
+  const headerTitle = fromAlerts
+    ? "Alerts"
+    : fromVault
+    ? "My Documents"
+    : "Design Report";
+  const headerSubtitle = fromAlerts
+    ? "Back to Alerts"
+    : fromVault
+    ? "Back to Document Vault"
+    : "Your Design Journey with PARAPET";
+  // Default back is to the design results carousel for the same session
+  // (the page that owns "this is your design"). Day 44 round-3 feedback:
+  // back from Design Studio was redirecting to homepage; the cause was
+  // likely a missing or stale sessionId, which used to fall through here.
+  // Now we always have a results page to return to when sessionId is set.
+  const backPath = fromAlerts
+    ? "/notifications"
+    : fromVault
     ? "/documents"
-    : `/design/results?session=${sessionId}`;
+    : sessionId
+    ? `/design/results?session=${sessionId}`
+    : "/design";
 
   const { toast } = useToast();
   const [conceptData, setConceptData] = useState<any>(null);
