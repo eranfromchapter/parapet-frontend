@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowRight, ChevronDown, ChevronUp, ScanLine, Video,
+  ArrowRight, ChevronDown, ChevronUp, ScanLine,
   AlertTriangle, CheckCircle2, Clock, Loader2,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
