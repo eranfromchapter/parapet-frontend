@@ -255,9 +255,9 @@ function GeneratingContent() {
           <Sparkles size={48} className="text-[#1E3A5F] animate-pulse" />
         </div>
 
-        <h1 className="text-xl font-bold text-foreground mb-2">Creating Your Design...</h1>
+        <h1 className="text-xl font-bold text-foreground mb-2">Creating your design concept</h1>
         <p className="text-base text-muted-foreground text-center max-w-[320px] mb-3">
-          A custom design package like this used to take weeks. We&apos;ll have yours ready in 10&ndash;15 minutes.
+          This may take several minutes. You can leave this page safely &mdash; we&apos;ll notify you when the design is ready and save it in your Document Vault.
         </p>
         <p className="text-sm text-muted-foreground mb-8">{STEPS[currentStep] || "Generating design concepts"}...</p>
 
@@ -306,6 +306,24 @@ function GeneratingContent() {
               {(localSummary?.vision_text || summaryItems?.vision_text) ? "Added" : "None"}
             </span>
           </div>
+        </div>
+
+        <div className="w-full mt-8 flex flex-col gap-3">
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="w-full py-3 px-4 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+          >
+            Return Home
+          </button>
+          <button
+            onClick={() => router.push("/documents")}
+            className="w-full py-3 px-4 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+          >
+            Go to Document Vault
+          </button>
+          <p className="text-sm text-gray-500 text-center">
+            Your design will continue generating in the background. We&apos;ll notify you when it&apos;s ready.
+          </p>
         </div>
       </div>
 

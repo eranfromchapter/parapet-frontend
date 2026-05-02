@@ -362,9 +362,12 @@ function EstimateGeneratingContent() {
           </div>
         </div>
 
-        <h1 className="text-lg font-bold text-foreground text-center mb-6">
-          {animationDone ? "Finalizing your estimate..." : "Generating Your Estimate"}
+        <h1 className="text-lg font-bold text-foreground text-center mb-3">
+          {animationDone ? "Finalizing your estimate..." : "Creating your AI renovation estimate"}
         </h1>
+        <p className="text-[12px] text-muted-foreground text-center max-w-[340px] leading-relaxed mb-6">
+          Traditional renovation estimates can take up to 10 business days &mdash; Parapet analyzes your project description, spatial report, and video walkthrough to create a detailed estimate in minutes.
+        </p>
 
         <div className="w-full max-w-[280px] space-y-2.5 mb-8">
           {activeSteps.map((step, i) => {
@@ -424,23 +427,31 @@ function EstimateGeneratingContent() {
             <p className="text-xs font-semibold text-foreground mb-1">
               Taking longer than expected
             </p>
-            <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">
-              You can safely close this page — your estimate will appear in your Document Vault when it&apos;s ready.
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              You can safely close this page &mdash; your estimate will appear in your Document Vault when it&apos;s ready.
             </p>
-            <Link
-              href="/documents"
-              className="text-[11px] font-semibold text-[#1E3A5F] underline-offset-2 hover:underline"
-            >
-              Open Document Vault
-            </Link>
           </div>
         )}
       </div>
 
-      <div className="px-8 pb-8 text-center">
-        <p className="text-[10px] text-muted-foreground leading-relaxed">
-          Parapet AI is analyzing your video walkthrough, LiDAR scan, and uploaded documentation to generate a comprehensive renovation estimate.
-        </p>
+      <div className="px-8 pb-8">
+        <div className="flex flex-col gap-3 max-w-[340px] mx-auto">
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="w-full py-3 px-4 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+          >
+            Return Home
+          </button>
+          <button
+            onClick={() => router.push("/documents")}
+            className="w-full py-3 px-4 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+          >
+            Go to Document Vault
+          </button>
+          <p className="text-sm text-gray-500 text-center">
+            Your estimate will continue generating in the background. We&apos;ll notify you when it&apos;s ready.
+          </p>
+        </div>
       </div>
     </div>
   );
