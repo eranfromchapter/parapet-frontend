@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import ParapetLogo from "@/components/ParapetLogo";
 import { getAuthHeaders } from "@/lib/auth";
@@ -23,7 +24,61 @@ const STEPS: Step[] = [
   { label: "Compiling your detailed estimate", condition: "always", duration: 3000 },
 ];
 
-const HARD_TIMEOUT_MS = 90_000;
+// Backend pipeline timeout is ~120s; pages downstream promise minutes — give
+// the UI 5 minutes before flipping to the timeout state.
+const HARD_TIMEOUT_MS = 300_000;
+// After 2 minutes we suggest the user can close the page; the estimate will
+// land in the Document Vault when it's ready.
+const SLOW_THRESHOLD_MS = 120_000;
+
+// In-flight job persistence — survives refresh and back/forward so the
+// non-idempotent POST is fired exactly once per (spatialId, walkthroughId)
+// pair. Cleared on successful redirect to /estimate/{id}.
+const STORAGE_KEY = "parapet_estimate_job";
+
+interface StoredJob {
+  spatialId: string | null;
+  walkthroughId: string | null;
+  estimateId: string | null;
+  startedAt: number;
+}
+
+function readJob(): StoredJob | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as StoredJob) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeJob(job: StoredJob) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(job));
+  } catch {
+    /* quota / disabled storage — tolerate silently */
+  }
+}
+
+function clearJob() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function jobMatchesParams(
+  job: StoredJob | null,
+  spatialId: string | null,
+  walkthroughId: string | null,
+): boolean {
+  if (!job) return false;
+  return job.spatialId === spatialId && job.walkthroughId === walkthroughId;
+}
 
 function EstimateGeneratingContent() {
   const router = useRouter();
@@ -44,17 +99,52 @@ function EstimateGeneratingContent() {
   const [animationDone, setAnimationDone] = useState(false);
   const [errorState, setErrorState] = useState<"timeout" | "failed" | null>(null);
   const [errorDetail, setErrorDetail] = useState("");
+  const [isSlow, setIsSlow] = useState(false);
   const startTime = useRef(Date.now());
   const redirected = useRef(false);
   const triggered = useRef(false);
   const estimateIdRef = useRef<string | null>(null);
 
+  // After 2 minutes, surface a "still working" hint and a vault link so the
+  // user can leave the page without losing access to their estimate.
+  useEffect(() => {
+    const t = setTimeout(() => setIsSlow(true), SLOW_THRESHOLD_MS);
+    return () => clearTimeout(t);
+  }, []);
+
   // ── Trigger backend processing on mount ──
   // Spatial estimate is SYNCHRONOUS — await its response directly
   // Walkthrough analyze is ASYNC — returns 202, then poll for completion
+  //
+  // Refresh-safety: an in-flight job is persisted to sessionStorage so a
+  // refresh or back/forward never re-fires the non-idempotent POST. If the
+  // saved job already has an estimateId, we resume the redirect path.
   useEffect(() => {
     if (triggered.current) return;
     triggered.current = true;
+
+    const existing = readJob();
+    if (jobMatchesParams(existing, spatialId, walkthroughId) && existing) {
+      // Resume — never re-POST.
+      if (existing.estimateId) {
+        estimateIdRef.current = existing.estimateId;
+        const savedId = existing.estimateId;
+        const minWait = Math.max(0, totalDuration - (Date.now() - startTime.current));
+        setTimeout(() => {
+          if (!redirected.current) {
+            redirected.current = true;
+            clearJob();
+            router.push(`/estimate/${savedId}`);
+          }
+        }, Math.min(minWait, 3000));
+      }
+      // Walkthrough-only resume: the polling effect below will pick up.
+      return;
+    }
+
+    // Fresh job — record the marker before firing the POST so concurrent
+    // mounts (e.g. React StrictMode double-invoke) see a job and bail.
+    writeJob({ spatialId, walkthroughId, estimateId: null, startedAt: Date.now() });
 
     async function triggerProcessing() {
       try {
@@ -100,6 +190,7 @@ function EstimateGeneratingContent() {
         if (spatialResult && !spatialResult.ok) {
           // Spatial failed but walkthrough might still work
           if (!walkthroughId) {
+            clearJob();
             setErrorState("failed");
             setErrorDetail(spatialResult.error || "Estimate generation failed");
             return;
@@ -107,6 +198,7 @@ function EstimateGeneratingContent() {
         }
 
         if (walkthroughResult && !walkthroughResult.ok && !spatialId) {
+          clearJob();
           setErrorState("failed");
           setErrorDetail(walkthroughResult.error || "Analysis failed");
           return;
@@ -121,16 +213,21 @@ function EstimateGeneratingContent() {
           if (!estimateId) {
             // Compute succeeded but persistence failed (best-effort write).
             // Don't navigate to a broken URL — surface the error and let the user retry.
+            clearJob();
             setErrorState("failed");
             setErrorDetail("Estimate generated but couldn't be saved. Please try again.");
             return;
           }
 
           estimateIdRef.current = estimateId;
+          // Persist the estimate id — if the user refreshes during the
+          // animation wait, we resume the redirect instead of re-POSTing.
+          writeJob({ spatialId, walkthroughId, estimateId, startedAt: Date.now() });
           const minWait = Math.max(0, totalDuration - (Date.now() - startTime.current));
           setTimeout(() => {
             if (!redirected.current) {
               redirected.current = true;
+              clearJob();
               router.push(`/estimate/${estimateId}`);
             }
           }, Math.min(minWait, 3000));
@@ -140,6 +237,7 @@ function EstimateGeneratingContent() {
         // Walkthrough-only (no spatial): poll for walkthrough completion
         // (polling is handled by the separate useEffect below)
       } catch (err) {
+        clearJob();
         setErrorState("failed");
         setErrorDetail(err instanceof Error ? err.message : "Processing failed");
       }
@@ -189,12 +287,21 @@ function EstimateGeneratingContent() {
 
       if (data.status === "analyzed" || data.analysis) {
         redirected.current = true;
-        // If a persisted estimate exists (from the spatial POST), go to it; otherwise dashboard.
-        const estId = estimateIdRef.current;
-        router.push(estId ? `/estimate/${estId}` : "/dashboard");
+        clearJob();
+        // Prefer (1) an estimate id captured from a spatial POST in this
+        // session, (2) an estimate id surfaced by the analysis response, then
+        // (3) the walkthrough detail page — a much better fallback than the
+        // bare /dashboard the user was previously dropped onto.
+        const analysisEstId =
+          (typeof data.estimate_id === "string" && data.estimate_id) ||
+          (typeof data.analysis?.estimate_id === "string" && data.analysis.estimate_id) ||
+          null;
+        const estId = estimateIdRef.current || analysisEstId;
+        router.push(estId ? `/estimate/${estId}` : `/walkthrough/${walkthroughId}`);
         return;
       }
       if (data.status === "analysis_failed") {
+        clearJob();
         setErrorState("failed");
         setErrorDetail(data.error_message || "Walkthrough analysis failed");
       }
@@ -231,10 +338,12 @@ function EstimateGeneratingContent() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-background px-8">
         <ParapetLogo size={48} className="text-[#1E3A5F] mb-6" />
         <h1 className="text-lg font-bold text-foreground mb-2">Taking longer than expected</h1>
-        <p className="text-sm text-muted-foreground text-center mb-6">Your estimate is still processing. Please check back shortly.</p>
-        <button onClick={() => router.push("/dashboard")} className="px-6 py-3 bg-[#1E3A5F] text-white rounded-xl font-medium text-sm hover:bg-[#2A4F7A] transition-colors">
-          Back to Dashboard
-        </button>
+        <p className="text-sm text-muted-foreground text-center mb-6 max-w-[320px]">
+          Your estimate is still processing. It will appear in your Document Vault when it&apos;s ready.
+        </p>
+        <Link href="/documents" className="px-6 py-3 bg-[#1E3A5F] text-white rounded-xl font-medium text-sm hover:bg-[#2A4F7A] transition-colors">
+          Open Document Vault
+        </Link>
       </div>
     );
   }
@@ -310,6 +419,23 @@ function EstimateGeneratingContent() {
               : `linear-gradient(90deg, #1E3A5F ${Math.max(0, overallProgress - 10)}%, #2BCBBA ${overallProgress}%, hsl(var(--muted)) ${Math.min(100, overallProgress + 5)}%)`,
           }} />
         </div>
+
+        {isSlow && (
+          <div className="mt-6 max-w-[320px] rounded-xl border border-[#1E3A5F]/15 bg-[#1E3A5F]/5 px-4 py-3 text-center">
+            <p className="text-xs font-semibold text-foreground mb-1">
+              Taking longer than expected
+            </p>
+            <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">
+              You can safely close this page — your estimate will appear in your Document Vault when it&apos;s ready.
+            </p>
+            <Link
+              href="/documents"
+              className="text-[11px] font-semibold text-[#1E3A5F] underline-offset-2 hover:underline"
+            >
+              Open Document Vault
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="px-8 pb-8 text-center">
