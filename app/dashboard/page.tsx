@@ -1,10 +1,15 @@
 'use client';
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useMemo } from "react";
 import ParapetLogo from "@/components/ParapetLogo";
 import BottomNav from "@/components/BottomNav";
-import { getAuthHeaders } from "@/lib/auth";
+import {
+  useProfile,
+  useReadinessReports,
+  useReadinessReport,
+  useWalkthroughs,
+} from "@/lib/hooks/use-dashboard";
 import {
   Plus, ArrowRight, Camera, FileText, BarChart3,
   AlertTriangle, Scan, PenTool, Palette, Scale,
@@ -14,9 +19,6 @@ import {
 } from "lucide-react";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-
-// Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
-const API_URL = "/api/backend";
 
 // ── Phase modules ──
 
@@ -37,66 +39,54 @@ const statusStyles: Record<ModuleStatus, { bg: string; text: string; label: stri
 };
 
 export default function DashboardPage() {
-  const [latestReport, setLatestReport] = useState<any>(null);
-  const [latestSpatialId, setLatestSpatialId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [userInitials, setUserInitials] = useState<string | null>(null);
+  const profileQuery = useProfile();
+  const reportsQuery = useReadinessReports();
+  const walkthroughsQuery = useWalkthroughs();
 
-  useEffect(() => {
-    async function fetchData() {
+  const userInitials = useMemo(() => {
+    const profile = profileQuery.data;
+    if (!profile) return null;
+    const first = profile.first_name;
+    const last = profile.last_name;
+    if (first && last) return `${first[0]}${last[0]}`.toUpperCase();
+    if (first) return first[0].toUpperCase();
+    return null;
+  }, [profileQuery.data]);
+
+  // Pull the latest completed report id out of the list, then fetch the
+  // detail through the cached hook so the result survives navigation.
+  const latestCompletedReportId = useMemo<string | null>(() => {
+    const data = reportsQuery.data;
+    if (!data) return null;
+    const reports: any[] = Array.isArray(data) ? data : data.reports ?? data.items ?? [];
+    const completed = reports.find((r: any) => r.status === "completed");
+    return completed?.id ?? null;
+  }, [reportsQuery.data]);
+
+  const latestReportQuery = useReadinessReport(latestCompletedReportId);
+  const latestReport = latestReportQuery.data ?? null;
+
+  // spatial_id comes from a walkthrough that links to one, or the
+  // localStorage fallback set when the user uploaded a scan directly.
+  const latestSpatialId = useMemo<string | null>(() => {
+    const wts = walkthroughsQuery.data;
+    const wtList: any[] = Array.isArray(wts) ? wts : [];
+    const withSpatial = wtList.find((w: any) => w.spatial_id);
+    if (withSpatial?.spatial_id) return withSpatial.spatial_id;
+    if (typeof window !== "undefined") {
       try {
-        // Run profile, reports list, and walkthroughs in parallel — saves 2 RTTs
-        const [profileResult, reportsResult, wtResult] = await Promise.allSettled([
-          fetch(`${API_URL}/v1/users/profile`, { headers: getAuthHeaders() }),
-          fetch(`${API_URL}/v1/readiness-reports`, { headers: getAuthHeaders() }),
-          fetch(`${API_URL}/v1/walkthrough`, { headers: getAuthHeaders() }),
-        ]);
-
-        // Profile
-        if (profileResult.status === "fulfilled" && profileResult.value.ok) {
-          const profile = await profileResult.value.json();
-          const first = profile.first_name;
-          const last = profile.last_name;
-          if (first && last) setUserInitials(`${first[0]}${last[0]}`.toUpperCase());
-          else if (first) setUserInitials(first[0].toUpperCase());
-        }
-
-        // Reports list → then fetch detail (must wait for list to get the id)
-        if (reportsResult.status === "fulfilled" && reportsResult.value.ok) {
-          const data = await reportsResult.value.json();
-          const reports: any[] = Array.isArray(data) ? data : data.reports ?? data.items ?? [];
-          const completed = reports.find((r: any) => r.status === "completed");
-          if (completed) {
-            const fullRes = await fetch(`${API_URL}/v1/readiness-reports/${completed.id}`, {
-              headers: getAuthHeaders(),
-            });
-            if (fullRes.ok) setLatestReport(await fullRes.json());
-          }
-        }
-
-        // Walkthroughs → spatial_id
-        let foundSpatialId: string | null = null;
-        if (wtResult.status === "fulfilled" && wtResult.value.ok) {
-          const wts = await wtResult.value.json();
-          const wtList: any[] = Array.isArray(wts) ? wts : [];
-          const withSpatial = wtList.find((w: any) => w.spatial_id);
-          if (withSpatial?.spatial_id) foundSpatialId = withSpatial.spatial_id;
-        }
-
-        // Fallback: check localStorage for spatial_id from direct upload
-        if (!foundSpatialId) {
-          try {
-            const stored = localStorage.getItem("parapet_spatial_id");
-            if (stored) foundSpatialId = stored;
-          } catch { /* localStorage unavailable */ }
-        }
-
-        if (foundSpatialId) setLatestSpatialId(foundSpatialId);
-      } catch { /* silently fail */ }
-      finally { setLoading(false); }
+        const stored = localStorage.getItem("parapet_spatial_id");
+        if (stored) return stored;
+      } catch { /* localStorage unavailable */ }
     }
-    fetchData();
-  }, []);
+    return null;
+  }, [walkthroughsQuery.data]);
+
+  const loading =
+    profileQuery.isPending ||
+    reportsQuery.isPending ||
+    walkthroughsQuery.isPending ||
+    (latestCompletedReportId !== null && latestReportQuery.isPending);
 
   const reportId = latestReport?.id;
   const rj = latestReport?.report_json;
