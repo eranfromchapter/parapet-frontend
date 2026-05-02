@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   FileText, ScanLine, Video, Palette, Calculator, FolderOpen,
-  ChevronRight, Loader2, Trash2,
+  ChevronRight, Loader2, Trash2, Download,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
@@ -111,6 +111,23 @@ function getDeleteUrl(doc: Document): string | null {
   }
 }
 
+// Map a document type to its PDF endpoint. spatial / walkthrough have no
+// PDF representation, so the download button hides for those types.
+function getPdfUrl(doc: Document): string | null {
+  switch (doc.type) {
+    case "report": return `${API_URL}/v1/readiness-reports/${doc.id}/pdf`;
+    case "design": return `${API_URL}/v1/design/${doc.id}/pdf`;
+    case "estimate": return `${API_URL}/v1/estimates/${doc.id}/pdf`;
+    default: return null;
+  }
+}
+
+function safeFilename(title: string, fallback: string): string {
+  const cleaned = (title || "").replace(/[^A-Za-z0-9._ -]+/g, "").trim();
+  const base = cleaned.length > 0 ? cleaned : fallback;
+  return base.endsWith(".pdf") ? base : `${base}.pdf`;
+}
+
 type FilterType = "all" | "report" | "spatial" | "walkthrough" | "design" | "estimate";
 
 const FILTERS: { key: FilterType; label: string; statsKey?: keyof Stats["by_type"] }[] = [
@@ -131,6 +148,45 @@ export default function DocumentVaultPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Document | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
+
+  const handleDownload = async (doc: Document) => {
+    const url = getPdfUrl(doc);
+    if (!url) return;
+    setDownloadingIds((prev) => new Set(prev).add(doc.id));
+    try {
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `Server responded ${res.status}`);
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const cdMatch = cd.match(/filename="?([^"]+)"?/);
+      const filename = cdMatch ? cdMatch[1] : safeFilename(doc.title, `PARAPET-${doc.type}-${doc.id}`);
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Defer revoke so Safari has time to start the download.
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't download document",
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setDownloadingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(doc.id);
+        return next;
+      });
+    }
+  };
 
   const handleDelete = async (doc: Document) => {
     const url = getDeleteUrl(doc);
@@ -298,7 +354,9 @@ export default function DocumentVaultPage() {
 
             const archived = !!doc.archived;
             const canDelete = getDeleteUrl(doc) !== null;
+            const canDownload = getPdfUrl(doc) !== null;
             const isDeleting = deletingIds.has(doc.id);
+            const isDownloading = downloadingIds.has(doc.id);
             return (
               <Link key={doc.id} href={getDocHref(doc)}>
                 <div className={`bg-white rounded-xl border p-3.5 flex items-center gap-3 transition-colors overflow-hidden ${
@@ -330,6 +388,21 @@ export default function DocumentVaultPage() {
                       <span className="text-[10px] text-muted-foreground/60">{timeAgo(doc.created_at)}</span>
                     </div>
                   </div>
+                  {canDownload && (
+                    <button
+                      type="button"
+                      aria-label={`Download ${doc.title}`}
+                      disabled={isDownloading}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDownload(doc);
+                      }}
+                      className="p-2 rounded-lg text-muted-foreground hover:text-[#1E3A5F] hover:bg-[#1E3A5F]/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                    >
+                      {isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                    </button>
+                  )}
                   {canDelete && (
                     <button
                       type="button"
