@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ChevronLeft, Maximize, Video, Upload, CheckCircle2,
   Camera, ArrowRight, Mic, X, Info, ChevronRight,
-  ScanLine, Loader2,
+  ScanLine, Loader2, AlertCircle, FolderOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -157,6 +157,18 @@ function timeAgo(iso: string | undefined | null): string {
   return `${months}mo ago`;
 }
 
+function formatDuration(totalSeconds: number | undefined): string | null {
+  if (totalSeconds == null || !Number.isFinite(totalSeconds) || totalSeconds <= 0) return null;
+  const t = Math.round(totalSeconds);
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const s = t % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 type WalkthroughBadgeKind = "processing" | "transcribed" | "failed";
 
 function walkthroughBadge(status: string | undefined): { kind: WalkthroughBadgeKind; label: string } {
@@ -186,9 +198,17 @@ export default function SpaceCapturePage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  // Tracks recording start so the upload card can report an accurate
+  // duration without relying on the (stale-closure) recordingTime state.
+  const recordingStartRef = useRef<number>(0);
 
   const [spatialId, setSpatialId] = useState<string | null>(null);
   const [walkthroughId, setWalkthroughId] = useState<string | null>(null);
+  // Captured at upload time so the success card has filename + duration —
+  // /v1/documents/vault carries them but isn't always refreshed by the time
+  // we render the card right after the upload.
+  const [walkthroughInfo, setWalkthroughInfo] = useState<{ filename: string; durationSec?: number } | null>(null);
+  const [walkthroughError, setWalkthroughError] = useState<string | null>(null);
   const [rooms, setRooms] = useState<any[]>([]);
   // Authoritative total from the Polycam-parsed PropertyOverview. Populated
   // on upload so the Space Capture page surfaces total sqft alongside the
@@ -314,32 +334,41 @@ export default function SpaceCapturePage() {
       } else if (["mp4", "mov", "webm"].includes(ext)) {
         setUploadProgress("Uploading video...");
         setUploadPercent(0);
+        setWalkthroughError(null);
         const fd = new FormData();
         fd.append("file", file);
         const qp = new URLSearchParams();
         if (spatialId) qp.set("spatial_id", spatialId);
         const url = `${API_URL}/v1/walkthrough/upload${qp.toString() ? "?" + qp : ""}`;
         const result = await uploadWithProgress(url, fd);
-        if (!result.ok) throw new Error(result.error || "Upload failed");
-        const wid = (result.data as Record<string, string>)?.id || (result.data as Record<string, string>)?.walkthrough_id;
-        setWalkthroughId(wid || null);
+        if (!result.ok) {
+          setWalkthroughError(result.error || "Upload failed");
+          throw new Error(result.error || "Upload failed");
+        }
+        const data = result.data as Record<string, unknown> | undefined;
+        const wid = (data?.id as string) || (data?.walkthrough_id as string) || null;
+        setWalkthroughId(wid);
+        const respDuration =
+          (typeof data?.duration_seconds === "number" && data.duration_seconds) ||
+          (typeof data?.duration === "number" && data.duration) ||
+          undefined;
+        const respFilename =
+          (typeof data?.original_filename === "string" && data.original_filename) ||
+          (typeof data?.filename === "string" && data.filename) ||
+          file.name;
+        setWalkthroughInfo({ filename: respFilename, durationSec: respDuration });
 
         // Transcription is best-effort: its failure (e.g. OPENAI_API_KEY missing
         // on the backend) must not surface as an upload failure, since the video
         // itself was stored successfully.
-        let transcriptionStarted = false;
         if (wid) {
           setUploadProgress("Starting transcription...");
           try {
-            const txRes = await fetch(`${API_URL}/v1/walkthrough/${wid}/transcribe`, { method: "POST", headers: getAuthHeaders() });
-            transcriptionStarted = txRes.ok;
+            await fetch(`${API_URL}/v1/walkthrough/${wid}/transcribe`, { method: "POST", headers: getAuthHeaders() });
           } catch {
-            transcriptionStarted = false;
+            /* best-effort */
           }
         }
-        setToast(transcriptionStarted
-          ? "Video uploaded! Transcription started."
-          : "Video uploaded. Transcription will start shortly.");
       } else if (["jpg", "jpeg", "png", "heic"].includes(ext)) {
         const url = URL.createObjectURL(file);
         setPhotos(prev => [...prev, url]);
@@ -389,37 +418,49 @@ export default function SpaceCapturePage() {
         stream.getTracks().forEach(t => t.stop());
         streamRef.current = null;
         const blob = new Blob(chunksRef.current, { type: blobType });
+        // Wall-clock recording duration. Reading recordingTime here would
+        // hit a stale closure (startRecording is memoized on [spatialId]).
+        const recordedSeconds = recordingStartRef.current
+          ? Math.round((Date.now() - recordingStartRef.current) / 1000)
+          : 0;
         setIsRecording(false);
         setRecordingTime(0);
+        const recordingFilename = `walkthrough.${ext}`;
 
         // Upload
         setIsUploading(true);
         setUploadProgress("Uploading recording...");
         setUploadPercent(0);
+        setWalkthroughError(null);
         try {
           const fd = new FormData();
-          fd.append("file", blob, `walkthrough.${ext}`);
+          fd.append("file", blob, recordingFilename);
           const qp = new URLSearchParams();
           if (spatialId) qp.set("spatial_id", spatialId);
           const url = `${API_URL}/v1/walkthrough/upload${qp.toString() ? "?" + qp : ""}`;
           const result = await uploadWithProgress(url, fd);
-          if (!result.ok) throw new Error(result.error || "Upload failed");
-          const wid = (result.data as Record<string, string>)?.id || (result.data as Record<string, string>)?.walkthrough_id;
-          setWalkthroughId(wid || null);
+          if (!result.ok) {
+            setWalkthroughError(result.error || "Upload failed");
+            throw new Error(result.error || "Upload failed");
+          }
+          const data = result.data as Record<string, unknown> | undefined;
+          const wid = (data?.id as string) || (data?.walkthrough_id as string) || null;
+          setWalkthroughId(wid);
+          const respDuration =
+            (typeof data?.duration_seconds === "number" && data.duration_seconds) ||
+            (typeof data?.duration === "number" && data.duration) ||
+            recordedSeconds ||
+            undefined;
+          setWalkthroughInfo({ filename: recordingFilename, durationSec: respDuration });
           // Transcription is best-effort; don't let a transcribe failure surface as an upload failure.
-          let transcriptionStarted = false;
           if (wid) {
             setUploadProgress("Starting transcription...");
             try {
-              const txRes = await fetch(`${API_URL}/v1/walkthrough/${wid}/transcribe`, { method: "POST", headers: getAuthHeaders() });
-              transcriptionStarted = txRes.ok;
+              await fetch(`${API_URL}/v1/walkthrough/${wid}/transcribe`, { method: "POST", headers: getAuthHeaders() });
             } catch {
-              transcriptionStarted = false;
+              /* best-effort */
             }
           }
-          setToast(transcriptionStarted
-            ? "Video recorded and uploaded!"
-            : "Video recorded and uploaded. Transcription will start shortly.");
         } catch (err) {
           setToast(err instanceof Error ? err.message : "Upload failed");
         } finally {
@@ -429,6 +470,7 @@ export default function SpaceCapturePage() {
         }
       };
       mediaRecorderRef.current = recorder;
+      recordingStartRef.current = Date.now();
       recorder.start(1000); // Collect data every 1s for smoother chunks
       setIsRecording(true);
     } catch {
@@ -629,7 +671,7 @@ export default function SpaceCapturePage() {
           </div>
 
           {/* ── Status indicators ── */}
-          {(spatialId || walkthroughId) && (
+          {(spatialId || walkthroughId || walkthroughError) && (
             <div className="space-y-2 mb-4">
               {spatialId && (
                 <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200/50">
@@ -637,15 +679,71 @@ export default function SpaceCapturePage() {
                   <span className="text-[11px] font-medium text-emerald-800">LiDAR scan uploaded</span>
                 </div>
               )}
-              {walkthroughId && (
-                <button
-                  onClick={() => router.push(`/walkthrough/${walkthroughId}`)}
-                  className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200/50 w-full text-left hover:bg-emerald-100/60 transition-colors"
-                >
-                  <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
-                  <span className="text-[11px] font-medium text-emerald-800 flex-1">Video walkthrough uploaded</span>
-                  <ChevronRight size={12} className="text-emerald-500 shrink-0" />
-                </button>
+
+              {/* Walkthrough success card — green check, filename, duration,
+                  Document Vault and viewer entry points. */}
+              {walkthroughId && !walkthroughError && (
+                <div className="rounded-xl bg-emerald-50 border border-emerald-200/60 p-3.5">
+                  <div className="flex items-start gap-2.5 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                      <CheckCircle2 size={18} className="text-emerald-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-emerald-900">Video uploaded successfully</p>
+                      {walkthroughInfo?.filename && (
+                        <p className="text-[11px] text-emerald-800/80 truncate">{walkthroughInfo.filename}</p>
+                      )}
+                      {(() => {
+                        const formatted = formatDuration(walkthroughInfo?.durationSec);
+                        return formatted ? (
+                          <p className="text-[11px] text-emerald-800/70">Duration: {formatted}</p>
+                        ) : null;
+                      })()}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => router.push("/documents")}
+                      className="w-full h-10 rounded-lg bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <FolderOpen size={14} /> View in Document Vault
+                    </button>
+                    <button
+                      onClick={() => router.push(`/walkthrough/${walkthroughId}`)}
+                      className="w-full h-10 rounded-lg bg-white border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-emerald-100/40 transition-colors"
+                    >
+                      View Video <ChevronRight size={12} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Walkthrough error card — red icon, error text, Try Again
+                  resets the upload state so the user can pick a new file. */}
+              {walkthroughError && (
+                <div className="rounded-xl bg-red-50 border border-red-200/60 p-3.5">
+                  <div className="flex items-start gap-2.5 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                      <AlertCircle size={18} className="text-red-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-red-900">Video upload failed</p>
+                      <p className="text-[11px] text-red-800/80 break-words">{walkthroughError}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setWalkthroughError(null);
+                      setWalkthroughInfo(null);
+                      setUploadProgress("");
+                      setUploadPercent(0);
+                      fileInputRef.current?.click();
+                    }}
+                    className="w-full h-10 rounded-lg bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white text-xs font-semibold transition-colors"
+                  >
+                    Try Again
+                  </button>
+                </div>
               )}
             </div>
           )}

@@ -25,6 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import { getAuthHeaders } from "@/lib/auth";
 import { useVault, useDocumentStats } from "@/lib/hooks/use-documents";
+import { useWalkthroughs } from "@/lib/hooks/use-dashboard";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -63,6 +64,13 @@ const ICON_MAP: Record<string, typeof FileText> = {
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   completed: { bg: "bg-[#10B981]/15", text: "text-[#10B981]", label: "Completed" },
+  // Walkthrough lifecycle: transcribing → transcribed (analyzed). Map them
+  // explicitly so the badge reads as something useful instead of falling
+  // back to the generic "Uploaded".
+  transcribed: { bg: "bg-[#10B981]/15", text: "text-[#10B981]", label: "Transcribed" },
+  analyzed: { bg: "bg-[#10B981]/15", text: "text-[#10B981]", label: "Transcribed" },
+  transcribing: { bg: "bg-[#F59E0B]/15", text: "text-[#F59E0B]", label: "Processing" },
+  analyzing: { bg: "bg-[#F59E0B]/15", text: "text-[#F59E0B]", label: "Processing" },
   processing: { bg: "bg-[#F59E0B]/15", text: "text-[#F59E0B]", label: "Processing" },
   uploaded: { bg: "bg-gray-100", text: "text-gray-500", label: "Uploaded" },
 };
@@ -100,6 +108,16 @@ function getDocSubtitle(doc: Document): string {
     return `$${Math.round(doc.total_estimate).toLocaleString()}`;
   }
   return doc.subtitle;
+}
+
+function formatDuration(totalSeconds: number | undefined): string | null {
+  if (totalSeconds == null || !Number.isFinite(totalSeconds) || totalSeconds <= 0) return null;
+  const t = Math.round(totalSeconds);
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const s = t % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 // Map a document type to its DELETE endpoint. Estimates have no delete
@@ -147,10 +165,25 @@ export default function DocumentVaultPage() {
   const queryClient = useQueryClient();
   const vaultQuery = useVault();
   const statsQuery = useDocumentStats();
+  const walkthroughsQuery = useWalkthroughs();
   const documents: Document[] = vaultQuery.data?.documents ?? [];
   const stats: Stats | null = (statsQuery.data as Stats | null) ?? null;
   const loading = vaultQuery.isPending;
   const error = vaultQuery.error instanceof Error ? vaultQuery.error.message : null;
+  // Map of walkthrough id → duration. Vault tiles for type="walkthrough"
+  // surface the duration in their subtitle when /v1/walkthrough returns one.
+  const walkthroughDurationById = new Map<string, number>();
+  const wtList = walkthroughsQuery.data;
+  if (Array.isArray(wtList)) {
+    for (const wt of wtList) {
+      const id = (wt && typeof wt.id === "string") ? wt.id : null;
+      const dur =
+        (typeof wt?.duration_seconds === "number" && wt.duration_seconds) ||
+        (typeof wt?.duration === "number" && wt.duration) ||
+        null;
+      if (id && dur) walkthroughDurationById.set(id, dur);
+    }
+  }
   const [filter, setFilter] = useState<FilterType>("all");
   const [confirmDelete, setConfirmDelete] = useState<Document | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
@@ -363,7 +396,11 @@ export default function DocumentVaultPage() {
           filtered.map((doc) => {
             const Icon = ICON_MAP[doc.type] ?? FileText;
             const st = STATUS_STYLES[doc.status] ?? STATUS_STYLES.uploaded;
-            const subtitle = getDocSubtitle(doc);
+            const baseSubtitle = getDocSubtitle(doc);
+            const duration = doc.type === "walkthrough" ? formatDuration(walkthroughDurationById.get(doc.id)) : null;
+            const subtitle = duration
+              ? (baseSubtitle ? `${baseSubtitle} · ${duration}` : duration)
+              : baseSubtitle;
 
             const archived = !!doc.archived;
             const canDelete = getDeleteUrl(doc) !== null;
@@ -394,7 +431,7 @@ export default function DocumentVaultPage() {
                         </span>
                       ) : (
                         <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${st.bg} ${st.text}`}>
-                          {doc.status === "processing" && <Loader2 size={8} className="animate-spin" />}
+                          {st.label === "Processing" && <Loader2 size={8} className="animate-spin" />}
                           {st.label}
                         </span>
                       )}
