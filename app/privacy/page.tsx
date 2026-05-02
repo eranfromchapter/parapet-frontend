@@ -2,27 +2,27 @@
 
 import { Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
 
 function PrivacyPolicyContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const from = searchParams.get('from');
   const crossLinkHref = `/terms${from ? `?from=${from}` : ''}`;
 
+  // Soft-nav back so the IntakeWizardProvider keeps its in-memory state and
+  // never reaches the default-then-hydrate flash that a hard reload causes.
   const handleBack = () => {
-    if (typeof window === "undefined") return;
     if (from === 'intake') {
-      window.location.href = '/intake/review';
+      router.push('/intake/review');
     } else if (from === 'home') {
-      window.location.href = '/';
+      router.push('/');
     } else if (from === 'account') {
-      window.location.href = '/account';
-    } else if (window.history.length > 1) {
-      window.history.back();
+      router.push('/account');
     } else {
-      window.location.href = '/';
+      router.back();
     }
   };
 

@@ -96,17 +96,17 @@ async function fetchProfilePrefill(): Promise<Partial<IntakeFormData>> {
 }
 
 export function IntakeWizardProvider({ children }: { children: React.ReactNode }) {
-  const [formData, setFormData] = useState<IntakeFormData>(defaultFormData);
-  const hydratedRef = useRef(false);
+  // Synchronous hydration in the initial state — eliminates the one-frame
+  // flash of default values that occurred when the user navigated back from
+  // /terms or /privacy and the layout re-mounted. The window guard keeps
+  // SSR safe (server returns defaults; client reads sessionStorage on the
+  // very first render).
+  const [formData, setFormData] = useState<IntakeFormData>(loadInitialFormData);
+  const hydratedRef = useRef(true);
 
-  // Hydrate from sessionStorage on mount (client-only to avoid SSR mismatch).
-  // Then merge profile-prefill for returning users — only fills empty fields,
-  // never overwrites in-progress edits.
+  // Profile-prefill for returning users — async, so it stays in an effect.
+  // Only fills empty fields and never overwrites in-progress edits.
   useEffect(() => {
-    const fromStorage = loadInitialFormData();
-    setFormData(fromStorage);
-    hydratedRef.current = true;
-
     fetchProfilePrefill().then((prefill) => {
       if (!prefill || Object.keys(prefill).length === 0) return;
       setFormData((current) => {
