@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -11,6 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 import BottomNav from "@/components/BottomNav";
 import { getAuthHeaders } from "@/lib/auth";
+import { useVault } from "@/lib/hooks/use-documents";
+import { useWalkthroughs } from "@/lib/hooks/use-dashboard";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -201,42 +203,24 @@ export default function SpaceCapturePage() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
-  const [existingScans, setExistingScans] = useState<any[]>([]);
-  const [existingWalkthroughs, setExistingWalkthroughs] = useState<any[]>([]);
-  const [loadingExisting, setLoadingExisting] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Pull previously uploaded scans + walkthroughs so the page isn't empty
   // for returning users. Vault is the source of truth for spatial metadata
   // (subtitle line carries room count + sqft); /v1/walkthrough has the
-  // freshest analysis status for video uploads.
-  useEffect(() => {
-    let cancelled = false;
-    async function loadExisting() {
-      try {
-        const [vaultRes, wtRes] = await Promise.all([
-          fetch(`${API_URL}/v1/documents/vault`, { headers: getAuthHeaders() }),
-          fetch(`${API_URL}/v1/walkthrough`, { headers: getAuthHeaders() }),
-        ]);
-        if (cancelled) return;
-        if (vaultRes.ok) {
-          const data = await vaultRes.json();
-          const docs: any[] = data.documents ?? [];
-          setExistingScans(docs.filter((d) => d.type === "spatial"));
-        }
-        if (wtRes.ok) {
-          const list = await wtRes.json();
-          setExistingWalkthroughs(Array.isArray(list) ? list : []);
-        }
-      } catch {
-        /* fail silently — page still works for upload */
-      } finally {
-        if (!cancelled) setLoadingExisting(false);
-      }
-    }
-    loadExisting();
-    return () => { cancelled = true; };
-  }, []);
+  // freshest analysis status for video uploads. Both are cached, so
+  // navigating away and back doesn't re-fetch within the stale window.
+  const vaultQuery = useVault();
+  const walkthroughsQuery = useWalkthroughs();
+  const existingScans = useMemo<any[]>(() => {
+    const docs: any[] = vaultQuery.data?.documents ?? [];
+    return docs.filter((d) => d.type === "spatial");
+  }, [vaultQuery.data]);
+  const existingWalkthroughs = useMemo<any[]>(() => {
+    const list = walkthroughsQuery.data;
+    return Array.isArray(list) ? list : [];
+  }, [walkthroughsQuery.data]);
+  const loadingExisting = vaultQuery.isPending || walkthroughsQuery.isPending;
 
   // Recording timer
   useEffect(() => {

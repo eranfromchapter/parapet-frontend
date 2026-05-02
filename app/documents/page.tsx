@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   FileText, ScanLine, Video, Palette, Calculator, FolderOpen,
   ChevronRight, Loader2, Trash2, Download,
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 import { getAuthHeaders } from "@/lib/auth";
+import { useVault, useDocumentStats } from "@/lib/hooks/use-documents";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -141,11 +143,14 @@ const FILTERS: { key: FilterType; label: string; statsKey?: keyof Stats["by_type
 
 export default function DocumentVaultPage() {
   const router = useRouter();
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
+  const queryClient = useQueryClient();
+  const vaultQuery = useVault();
+  const statsQuery = useDocumentStats();
+  const documents: Document[] = vaultQuery.data?.documents ?? [];
+  const stats: Stats | null = (statsQuery.data as Stats | null) ?? null;
+  const loading = vaultQuery.isPending;
+  const error = vaultQuery.error instanceof Error ? vaultQuery.error.message : null;
   const [filter, setFilter] = useState<FilterType>("all");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Document | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
@@ -191,10 +196,30 @@ export default function DocumentVaultPage() {
   const handleDelete = async (doc: Document) => {
     const url = getDeleteUrl(doc);
     if (!url) return;
-    // Optimistic removal — snapshot for rollback if the request fails.
-    const snapshot = documents;
+    // Snapshot the cached vault + stats for rollback before optimistically
+    // mutating them through the query cache.
+    const vaultSnapshot = queryClient.getQueryData<{ documents: Document[] }>(['documents', 'vault']);
+    const statsSnapshot = queryClient.getQueryData<Stats>(['documents', 'stats']);
     setDeletingIds((prev) => new Set(prev).add(doc.id));
-    setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+    queryClient.setQueryData<{ documents: Document[] }>(['documents', 'vault'], (prev) => {
+      if (!prev) return prev;
+      return { ...prev, documents: prev.documents.filter((d) => d.id !== doc.id) };
+    });
+    queryClient.setQueryData<Stats>(['documents', 'stats'], (prev) => {
+      if (!prev) return prev;
+      const map: Record<Document["type"], keyof Stats["by_type"]> = {
+        report: "reports",
+        spatial: "spatial",
+        walkthrough: "walkthroughs",
+        design: "designs",
+        estimate: "estimates",
+      };
+      const key = map[doc.type];
+      return {
+        total: Math.max(0, prev.total - 1),
+        by_type: { ...prev.by_type, [key]: Math.max(0, prev.by_type[key] - 1) },
+      };
+    });
     try {
       const res = await fetch(url, { method: "DELETE", headers: getAuthHeaders() });
       if (!res.ok) {
@@ -202,24 +227,10 @@ export default function DocumentVaultPage() {
         throw new Error(text || `Server responded ${res.status}`);
       }
       toast({ title: "Deleted", description: doc.title });
-      // Reflect the deletion in the per-type counts so the filter pills update.
-      setStats((prev) => {
-        if (!prev) return prev;
-        const map: Record<Document["type"], keyof Stats["by_type"]> = {
-          report: "reports",
-          spatial: "spatial",
-          walkthrough: "walkthroughs",
-          design: "designs",
-          estimate: "estimates",
-        };
-        const key = map[doc.type];
-        return {
-          total: Math.max(0, prev.total - 1),
-          by_type: { ...prev.by_type, [key]: Math.max(0, prev.by_type[key] - 1) },
-        };
-      });
     } catch (err) {
-      setDocuments(snapshot);
+      // Restore both snapshots — keep the cache consistent if anything failed.
+      if (vaultSnapshot) queryClient.setQueryData(['documents', 'vault'], vaultSnapshot);
+      if (statsSnapshot) queryClient.setQueryData(['documents', 'stats'], statsSnapshot);
       toast({
         variant: "destructive",
         title: "Couldn't delete document",
@@ -233,28 +244,6 @@ export default function DocumentVaultPage() {
       });
     }
   };
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const [docsRes, statsRes] = await Promise.all([
-          fetch(`${API_URL}/v1/documents/vault`, { headers: getAuthHeaders() }),
-          fetch(`${API_URL}/v1/documents/stats`, { headers: getAuthHeaders() }),
-        ]);
-        if (!docsRes.ok) throw new Error(`Failed to load documents (${docsRes.status})`);
-        const docsData = await docsRes.json();
-        setDocuments(docsData.documents ?? []);
-        if (statsRes.ok) {
-          setStats(await statsRes.json());
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load documents");
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
 
   const filtered = filter === "all" ? documents : documents.filter(d => d.type === filter);
   const total = stats?.total ?? documents.length;

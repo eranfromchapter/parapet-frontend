@@ -12,6 +12,7 @@ import {
 import ParapetLogo from "@/components/ParapetLogo";
 import BottomNav from "@/components/BottomNav";
 import { getAuthHeaders, clearAuth } from "@/lib/auth";
+import { useEstimate } from "@/lib/hooks/use-estimate";
 
 // Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
 const API_URL = "/api/backend";
@@ -84,9 +85,36 @@ export default function EstimateViewPage() {
     ? "Back to Document Vault"
     : "Spatial-based line item estimate";
 
-  const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const estimateQuery = useEstimate(estimateId);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  // Derive the page's existing LoadState union from the query result so the
+  // rest of the rendering code (which already branches on kind) keeps working.
+  const state: LoadState = (() => {
+    if (estimateQuery.isPending) return { kind: "loading" };
+    if (estimateQuery.error instanceof Error) {
+      return { kind: "error", message: estimateQuery.error.message };
+    }
+    const result = estimateQuery.data;
+    if (!result) return { kind: "loading" };
+    if (result.kind === "unauthorized") return { kind: "loading" }; // redirect handled below
+    if (result.kind === "not-found") return { kind: "not-found" };
+    return { kind: "ok", estimate: result.estimate as Estimate };
+  })();
+
+  // Side effect: a 401/403 should clear auth and bounce to /login. Keep this
+  // out of the render branch so it runs exactly once per status change.
+  useEffect(() => {
+    if (estimateQuery.data?.kind === "unauthorized") {
+      clearAuth();
+      router.push("/login");
+    }
+  }, [estimateQuery.data, router]);
+
+  const loadEstimate = useCallback(() => {
+    estimateQuery.refetch();
+  }, [estimateQuery]);
 
   const handleDownloadPdf = useCallback(async () => {
     setDownloadingPdf(true);
@@ -120,36 +148,6 @@ export default function EstimateViewPage() {
     }
   }, [estimateId]);
 
-  const loadEstimate = useCallback(async () => {
-    setState({ kind: "loading" });
-    try {
-      const res = await fetch(`${API_URL}/v1/estimates/${estimateId}`, {
-        headers: getAuthHeaders(),
-      });
-      if (res.status === 401 || res.status === 403) {
-        clearAuth();
-        router.push("/login");
-        return;
-      }
-      if (res.status === 404) {
-        setState({ kind: "not-found" });
-        return;
-      }
-      if (!res.ok) {
-        setState({ kind: "error", message: `Server responded ${res.status}` });
-        return;
-      }
-      const data = (await res.json()) as Estimate;
-      setState({ kind: "ok", estimate: data });
-    } catch (err) {
-      setState({ kind: "error", message: err instanceof Error ? err.message : "Network error" });
-    }
-  }, [estimateId, router]);
-
-  useEffect(() => {
-    if (!estimateId) return;
-    loadEstimate();
-  }, [estimateId, loadEstimate]);
 
   if (state.kind === "loading") {
     return (

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { Sparkles, ChevronRight, Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
@@ -38,53 +38,45 @@ function formatBudget(range: string | undefined): string {
   return range;
 }
 
+async function fetchSessionsForProject(projectId: string): Promise<{ list: DesignSession[]; max?: number } | null> {
+  const res = await fetch(`${API_URL}/v1/design/sessions/${projectId}`, {
+    headers: getAuthHeaders(),
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Failed to load designs (${res.status})`);
+  const data = await res.json();
+  const list: DesignSession[] = data.sessions ?? data.items ?? (Array.isArray(data) ? data : []);
+  return { list, max: data.max_allowed };
+}
+
 export default function DesignHubPage() {
   const router = useRouter();
-  const [sessions, setSessions] = useState<DesignSession[]>([]);
-  const [maxAllowed, setMaxAllowed] = useState(3);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchSessions(projectId: string): Promise<{ list: DesignSession[]; max?: number } | null> {
-      try {
-        const res = await fetch(`${API_URL}/v1/design/sessions/${projectId}`, {
-          headers: getAuthHeaders(),
-        });
-        if (res.status === 404) return null;
-        if (!res.ok) throw new Error(`Failed to load designs (${res.status})`);
-        const data = await res.json();
-        const list: DesignSession[] = data.sessions ?? data.items ?? (Array.isArray(data) ? data : []);
-        return { list, max: data.max_allowed };
-      } catch (err) {
-        throw err;
+  // Single composite query so the cache key is stable across navigation.
+  // Same dual-fallback semantics as before: try spatial first, then "default".
+  const sessionsQuery = useQuery<{ list: DesignSession[]; max: number }>({
+    queryKey: ['design', 'sessions-with-fallback'],
+    queryFn: async () => {
+      const spatialId = (() => {
+        try { return localStorage.getItem("parapet_spatial_id"); } catch { return null; }
+      })();
+      let result: { list: DesignSession[]; max?: number } | null = null;
+      if (spatialId) {
+        result = await fetchSessionsForProject(spatialId);
       }
-    }
+      if (!result || result.list.length === 0) {
+        const fallback = await fetchSessionsForProject("default");
+        if (fallback && fallback.list.length > 0) result = fallback;
+      }
+      return { list: result?.list ?? [], max: result?.max ?? 3 };
+    },
+    staleTime: 30_000,
+  });
 
-    async function loadSessions() {
-      const spatialId = (() => { try { return localStorage.getItem("parapet_spatial_id"); } catch { return null; } })();
-      try {
-        // Try spatial ID first, then "default" as fallback
-        let result: { list: DesignSession[]; max?: number } | null = null;
-        if (spatialId) {
-          result = await fetchSessions(spatialId);
-        }
-        if (!result || result.list.length === 0) {
-          const fallback = await fetchSessions("default");
-          if (fallback && fallback.list.length > 0) result = fallback;
-        }
-        if (result) {
-          setSessions(result.list);
-          if (result.max != null) setMaxAllowed(result.max);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load designs");
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadSessions();
-  }, []);
+  const sessions: DesignSession[] = sessionsQuery.data?.list ?? [];
+  const maxAllowed = sessionsQuery.data?.max ?? 3;
+  const loading = sessionsQuery.isPending;
+  const error = sessionsQuery.error instanceof Error ? sessionsQuery.error.message : null;
 
   const count = sessions.length;
   const limitReached = count >= maxAllowed;

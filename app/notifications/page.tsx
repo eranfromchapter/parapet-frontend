@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Bell, CheckCheck } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
 import ParapetLogo from "@/components/ParapetLogo";
 import { getAuthHeaders } from "@/lib/auth";
+import { useNotifications } from "@/lib/hooks/use-notifications";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -188,34 +190,37 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "system", label: "System" },
 ];
 
+interface NotificationsResponse {
+  notifications: Notification[];
+  unread_count?: number;
+}
+
 export default function NotificationsPage() {
   const router = useRouter();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const queryClient = useQueryClient();
+  const notificationsQuery = useNotifications();
+  const data = notificationsQuery.data as NotificationsResponse | undefined;
+  const notifications: Notification[] = data?.notifications ?? [];
+  const unreadCount: number = data?.unread_count ?? 0;
+  const loading = notificationsQuery.isPending;
+  const error = notificationsQuery.error instanceof Error ? notificationsQuery.error.message : null;
   const [filter, setFilter] = useState<FilterKey>("all");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchNotifications = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_URL}/v1/notifications`, { headers: getAuthHeaders() });
-      if (!res.ok) throw new Error(`Failed to load notifications (${res.status})`);
-      const data = await res.json();
-      setNotifications(data.notifications ?? []);
-      setUnreadCount(data.unread_count ?? 0);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load notifications");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+  // Cache-aware patch helper — every read toggles below mutate the same key
+  // so the BottomNav and any future readers stay in sync.
+  const patchCache = (mut: (prev: NotificationsResponse) => NotificationsResponse) => {
+    queryClient.setQueryData<NotificationsResponse>(['notifications', 'list'], (prev) => {
+      if (!prev) return prev;
+      return mut(prev);
+    });
+  };
 
   const markAllRead = async () => {
-    // Optimistic update
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    setUnreadCount(0);
+    patchCache((prev) => ({
+      ...prev,
+      notifications: prev.notifications.map((n) => ({ ...n, read: true })),
+      unread_count: 0,
+    }));
     try {
       await fetch(`${API_URL}/v1/notifications/read-all`, {
         method: "PATCH",
@@ -226,9 +231,11 @@ export default function NotificationsPage() {
 
   const handleTap = async (n: Notification) => {
     if (!n.read && n.id) {
-      // Optimistic
-      setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      patchCache((prev) => ({
+        ...prev,
+        notifications: prev.notifications.map((x) => x.id === n.id ? { ...x, read: true } : x),
+        unread_count: Math.max(0, (prev.unread_count ?? 0) - 1),
+      }));
       fetch(`${API_URL}/v1/notifications/${n.id}/read`, {
         method: "PATCH",
         headers: getAuthHeaders(),
