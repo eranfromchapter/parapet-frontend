@@ -50,7 +50,7 @@ export default function ReportPage({ params }: { params: { reportId: string } })
 
   // If still processing, redirect to generating page
   if (report.status !== 'completed' || !report.report_json) {
-    router.push(`/generating/${report.id}`);
+    router.push(`/intake/generating?id=${report.id}`);
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />

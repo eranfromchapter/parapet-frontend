@@ -73,7 +73,7 @@ export default function ReadinessPage() {
       };
       const result = await api.createReadinessReport(data as unknown as Record<string, unknown>);
       store.reset();
-      router.push(`/generating/${result.id}`);
+      router.push(`/intake/generating?id=${result.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit. Please try again.');
     } finally {

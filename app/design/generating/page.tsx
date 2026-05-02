@@ -156,8 +156,7 @@ function GeneratingContent() {
         <p className="text-base text-muted-foreground text-center max-w-[320px] mb-3">
           A custom design package like this used to take weeks. We&apos;ll have yours ready in 10&ndash;15 minutes.
         </p>
-        <p className="text-sm text-muted-foreground mb-1">{STEPS[currentStep] || "Generating design concepts"}...</p>
-        <p className="text-xs text-muted-foreground/60 mb-8">Your designs will be ready in 1-2 minutes...</p>
+        <p className="text-sm text-muted-foreground mb-8">{STEPS[currentStep] || "Generating design concepts"}...</p>
 
         {/* Step dots */}
         <div className="flex items-center gap-2 mb-2">

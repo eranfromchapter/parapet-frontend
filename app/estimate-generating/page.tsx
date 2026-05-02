@@ -317,7 +317,6 @@ function EstimateGeneratingContent() {
   }, [walkthroughId, pollWalkthrough]);
 
   const overallProgress = Math.min((elapsed / totalDuration) * 100, 100);
-  const remainingSeconds = Math.max(0, Math.ceil((totalDuration - elapsed) / 1000));
 
   if (errorState === "failed") {
     return (
@@ -402,13 +401,13 @@ function EstimateGeneratingContent() {
           })}
         </div>
 
-        {!animationDone ? (
-          <p className="text-[11px] text-muted-foreground mb-6">Estimated time remaining: ~{remainingSeconds}s</p>
-        ) : (
+        {animationDone ? (
           <div className="flex items-center gap-2 mb-6">
             <div className="w-3 h-3 rounded-full border-2 border-[#1E3A5F] border-t-transparent animate-spin" />
             <p className="text-[11px] text-muted-foreground">Almost there...</p>
           </div>
+        ) : (
+          <p className="text-[11px] text-muted-foreground mb-6">This usually takes 2&ndash;5 minutes</p>
         )}
 
         <div className="w-full max-w-[300px]">
