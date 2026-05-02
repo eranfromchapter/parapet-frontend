@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Heart, Camera, Star, Sparkles } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
+import { toast } from "@/hooks/use-toast";
 import { getAuthHeaders } from "@/lib/auth";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -24,7 +25,9 @@ function ResultsContent() {
   const [session, setSession] = useState<any>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [favorites, setFavorites] = useState<Set<number>>(new Set());
+  // Server-backed: at most one favorited concept per session.
+  const [favoriteIndex, setFavoriteIndex] = useState<number | null>(null);
+  const [savingFavorite, setSavingFavorite] = useState(false);
 
   const fetchSession = useCallback(async () => {
     if (!sessionId) return;
@@ -35,6 +38,8 @@ function ResultsContent() {
       if (!res.ok) throw new Error(`${res.status}`);
       const data = await res.json();
       setSession(data);
+      const fav = data?.favorited_concept_index;
+      setFavoriteIndex(typeof fav === "number" ? fav : null);
     } catch { /* silently fail */ }
     finally { setLoading(false); }
   }, [sessionId]);
@@ -45,13 +50,35 @@ function ResultsContent() {
   const concept = concepts[activeTab];
   const conceptCount = concepts.length;
 
-  const toggleFavorite = (idx: number) => {
-    setFavorites(prev => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx); else next.add(idx);
-      return next;
-    });
-  };
+  // Optimistically flip the heart, then persist. Tapping the already-favorited
+  // concept clears the favorite (concept_index: null).
+  const toggleFavorite = useCallback(async (idx: number) => {
+    if (!sessionId) return;
+    const previous = favoriteIndex;
+    const nextValue = previous === idx ? null : idx;
+    setFavoriteIndex(nextValue);
+    setSavingFavorite(true);
+    try {
+      const res = await fetch(`${API_URL}/v1/design/${sessionId}/favorite`, {
+        method: "POST",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ concept_index: nextValue }),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `Server responded ${res.status}`);
+      }
+    } catch (err) {
+      setFavoriteIndex(previous);
+      toast({
+        variant: "destructive",
+        title: "Couldn't update favorite",
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setSavingFavorite(false);
+    }
+  }, [sessionId, favoriteIndex]);
 
   if (loading) {
     return (
@@ -101,10 +128,16 @@ function ResultsContent() {
                   <p className="text-xs text-muted-foreground">{concept.sub_style}</p>
                 )}
               </div>
-              <button onClick={() => toggleFavorite(activeTab)} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+              <button
+                onClick={() => toggleFavorite(activeTab)}
+                disabled={savingFavorite}
+                aria-label={favoriteIndex === activeTab ? "Unfavorite this concept" : "Favorite this concept"}
+                aria-pressed={favoriteIndex === activeTab}
+                className="p-1.5 rounded-lg hover:bg-muted transition-colors disabled:opacity-60"
+              >
                 <Heart
                   size={20}
-                  className={favorites.has(activeTab) ? "text-red-500 fill-red-500" : "text-muted-foreground"}
+                  className={favoriteIndex === activeTab ? "text-red-500 fill-red-500" : "text-muted-foreground"}
                 />
               </button>
             </div>
