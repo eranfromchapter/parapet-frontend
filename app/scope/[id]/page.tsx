@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ListFilter, Home,
-  Plus, FileText, Clock, Search, Droplets, BedDouble, Sofa,
+  FileText, Clock, Search, Droplets, BedDouble, Sofa,
+  Plus, Minus, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BottomNav from "@/components/BottomNav";
@@ -34,20 +35,38 @@ function getRoomIcon(name: string) {
 
 // ── Transform API line items into scope items ──
 
+function parseQuantity(q: unknown): { value: number; unit: string } {
+  if (typeof q === "number") return { value: q, unit: "" };
+  const s = String(q ?? "").trim();
+  const m = s.match(/^\s*(\d+(?:\.\d+)?)(.*)$/);
+  if (!m) return { value: 1, unit: "" };
+  return { value: Number(m[1]), unit: m[2].trim() };
+}
+
 function transformLineItems(lineItems: any[]): any[] {
-  return lineItems.map((li: any, i: number) => ({
-    id: li.item_code ?? String(i),
-    name: (li.description ?? li.scope_item ?? li.item_code ?? `Item ${i + 1}`).replace(/_/g, " "),
-    category: (li.category ?? "General").replace(/_/g, " "),
-    room: (li.room ?? "General").replace(/_/g, " "),
-    description: li.item_code ? `${li.item_code} \u2014 ${li.quantity ?? ""}` : (li.quantity ?? ""),
-    lowPrice: typeof li.subtotal === "number" ? Math.round(li.subtotal * 0.85) : 0,
-    highPrice: typeof li.subtotal === "number" ? Math.round(li.subtotal * 1.15) : 0,
-    subtotal: typeof li.subtotal === "number" ? li.subtotal : 0,
-    enabled: true,
-    confidenceScore: li.confidence_score,
-    pricingSource: li.pricing_source ?? li.source,
-  }));
+  return lineItems.map((li: any, i: number) => {
+    const { value, unit } = parseQuantity(li.quantity);
+    const subtotal = typeof li.subtotal === "number" ? li.subtotal : 0;
+    // Per-unit price so quantity changes can scale the line subtotal locally
+    // while we wait for the server to recompute it on the next refresh.
+    const unitPrice = value > 0 ? subtotal / value : subtotal;
+    return {
+      id: li.item_code ?? String(i),
+      name: (li.description ?? li.scope_item ?? li.item_code ?? `Item ${i + 1}`).replace(/_/g, " "),
+      category: (li.category ?? "General").replace(/_/g, " "),
+      room: (li.room ?? "General").replace(/_/g, " "),
+      description: li.item_code ? `${li.item_code} \u2014 ${li.quantity ?? ""}` : (li.quantity ?? ""),
+      lowPrice: Math.round(subtotal * 0.85),
+      highPrice: Math.round(subtotal * 1.15),
+      subtotal,
+      unitPrice,
+      quantity: value,
+      quantityUnit: unit,
+      enabled: true,
+      confidenceScore: li.confidence_score,
+      pricingSource: li.pricing_source ?? li.source,
+    };
+  });
 }
 
 function groupByRoom(items: any[]): { name: string; total: number; items: any[] }[] {
@@ -84,11 +103,55 @@ export default function ScopeEditorPage() {
 
   const [items, setItems] = useState<any[]>([]);
   const [estimate, setEstimate] = useState<any>(null);
+  const [estimateId, setEstimateId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"scope" | "room">("scope");
   const [expandedRoom, setExpandedRoom] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  // Per-item debounce so a flurry of taps coalesces into a single PATCH per
+  // item; mutations are persisted only when an estimate id exists (i.e. not
+  // the report-derived view, which has no live estimate).
+  const debounceMap = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const persistItem = useCallback((item: any, snapshot: any[]) => {
+    if (!estimateId) return; // Report-based scope is read-only on the server.
+    const itemId = item.id;
+    const existing = debounceMap.current.get(itemId);
+    if (existing) clearTimeout(existing);
+    const t = setTimeout(async () => {
+      debounceMap.current.delete(itemId);
+      setSavingIds((prev) => new Set(prev).add(itemId));
+      try {
+        const res = await fetch(`${API_URL}/v1/estimates/${estimateId}/scope`, {
+          method: "PATCH",
+          headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+          body: JSON.stringify({
+            item_code: itemId,
+            enabled: item.enabled,
+            quantity: typeof item.quantity === "number" ? item.quantity : undefined,
+          }),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(text || `Save failed (${res.status})`);
+        }
+      } catch (err) {
+        setItems(snapshot);
+        const msg = err instanceof Error ? err.message : "Couldn't save change";
+        setToast(msg);
+        setTimeout(() => setToast(null), 3000);
+      } finally {
+        setSavingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(itemId);
+          return next;
+        });
+      }
+    }, 500);
+    debounceMap.current.set(itemId, t);
+  }, [estimateId]);
 
   // Fetch real data
   const fetchEstimate = useCallback(async () => {
@@ -145,6 +208,8 @@ export default function ScopeEditorPage() {
       }
 
       setEstimate(data);
+      const eid = (data && typeof data.id === "string") ? data.id : null;
+      setEstimateId(eid);
       const transformed = transformLineItems(data.line_items ?? []);
       setItems(transformed);
     } catch (err) {
@@ -166,8 +231,40 @@ export default function ScopeEditorPage() {
     ? `${provenance.rooms_parsed} rooms scanned`
     : "Estimate";
 
+  // Optimistic-update + persist helpers — both snapshot the current items
+  // before mutating so persistItem() can revert on a non-2xx response.
   const toggleItem = (id: string) => {
-    setItems(prev => prev.map((i: any) => i.id === id ? { ...i, enabled: !i.enabled } : i));
+    const snapshot = items;
+    let updated: any | null = null;
+    const next = items.map((i: any) => {
+      if (i.id !== id) return i;
+      updated = { ...i, enabled: !i.enabled };
+      return updated;
+    });
+    setItems(next);
+    if (updated) persistItem(updated, snapshot);
+  };
+
+  const updateQuantity = (id: string, delta: number) => {
+    const snapshot = items;
+    let updated: any | null = null;
+    const next = items.map((i: any) => {
+      if (i.id !== id) return i;
+      const nextQty = Math.max(1, (i.quantity ?? 1) + delta);
+      if (nextQty === i.quantity) return i;
+      const newSubtotal = Math.round((i.unitPrice ?? 0) * nextQty);
+      updated = {
+        ...i,
+        quantity: nextQty,
+        subtotal: newSubtotal,
+        lowPrice: Math.round(newSubtotal * 0.85),
+        highPrice: Math.round(newSubtotal * 1.15),
+      };
+      return updated;
+    });
+    if (!updated) return;
+    setItems(next);
+    persistItem(updated, snapshot);
   };
 
   // Loading state
@@ -279,19 +376,29 @@ export default function ScopeEditorPage() {
 
           {/* ── BY SCOPE ITEM ── */}
           {viewMode === "scope" && (
-            <>
               <div className="mb-4">
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                   Scope Items ({enabledItems.length})
                 </h3>
                 <div className="space-y-3">
-                  {items.map((item: any) => (
+                  {items.map((item: any) => {
+                    const isSaving = savingIds.has(item.id);
+                    const canPersist = estimateId !== null;
+                    return (
                     <div key={item.id} className={`bg-white border border-[#E8ECF1] rounded-xl p-4 transition-opacity ${item.enabled ? "" : "opacity-60"}`}>
                       <div className="flex items-start justify-between mb-1">
                         <div className="flex-1 min-w-0 pr-3">
                           <p className={`text-sm font-semibold leading-tight ${item.enabled ? "text-foreground" : "text-muted-foreground"}`}>{item.name}</p>
                           {item.id && (
-                            <p className="text-[10px] text-muted-foreground/60 mt-0.5">{item.id}</p>
+                            <p className="text-[10px] text-muted-foreground/60 mt-0.5 flex items-center gap-1.5">
+                              <span>{item.id}</span>
+                              {isSaving && (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-[#1E3A5F]/70">
+                                  <Loader2 size={9} className="animate-spin" />
+                                  Saving\u2026
+                                </span>
+                              )}
+                            </p>
                           )}
                         </div>
                         <button
@@ -304,26 +411,45 @@ export default function ScopeEditorPage() {
                       {item.description && item.description !== item.name && !item.description.startsWith("RR-") && (
                         <p className={`text-xs leading-relaxed mb-2 ${item.enabled ? "text-muted-foreground" : "text-muted-foreground/70"}`}>{item.description}</p>
                       )}
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
                         <p className={`text-sm font-semibold ${item.enabled ? "text-foreground" : "text-muted-foreground"}`}>
                           {fmt(item.lowPrice)} {'\u2013'} {fmt(item.highPrice)}
                         </p>
-                        {item.confidenceScore != null && (
-                          <span className="text-[10px] font-medium text-[#2BCBBA]">{Math.round(item.confidenceScore)}% conf.</span>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {canPersist && item.enabled && (
+                            <div className="flex items-center gap-1 rounded-lg border border-[#E8ECF1] bg-white px-1 py-0.5">
+                              <button
+                                type="button"
+                                onClick={() => updateQuantity(item.id, -1)}
+                                disabled={item.quantity <= 1}
+                                aria-label="Decrease quantity"
+                                className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                              >
+                                <Minus size={12} />
+                              </button>
+                              <span className="text-[11px] font-semibold tabular-nums min-w-[26px] text-center text-foreground">
+                                {item.quantity}{item.quantityUnit ? ` ${item.quantityUnit}` : ""}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => updateQuantity(item.id, 1)}
+                                aria-label="Increase quantity"
+                                className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
+                          )}
+                          {item.confidenceScore != null && (
+                            <span className="text-[10px] font-medium text-[#2BCBBA]">{Math.round(item.confidenceScore)}% conf.</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
-
-              <button
-                onClick={() => { setToast("Coming soon"); setTimeout(() => setToast(null), 2000); }}
-                className="w-full py-3 rounded-xl border-2 border-dashed border-[#E8ECF1] text-sm font-medium text-muted-foreground hover:border-[#1E3A5F]/30 hover:text-foreground transition-all mb-4 flex items-center justify-center gap-1.5"
-              >
-                <Plus size={16} /> Add Scope Item
-              </button>
-            </>
           )}
 
           {/* ── BY ROOM ── */}
