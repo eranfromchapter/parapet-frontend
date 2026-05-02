@@ -65,7 +65,7 @@ function mapFormToBackend(formData: IntakeFormData) {
 
 export default function IntakeReview() {
   const router = useRouter();
-  const { formData } = useIntakeWizard();
+  const { formData, clearDraft } = useIntakeWizard();
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,6 +100,10 @@ export default function IntakeReview() {
       if (!reportId) {
         throw new Error("No report ID in response");
       }
+
+      // Successful submit — drop the draft on both server and sessionStorage
+      // so the next intake starts from a clean slate.
+      clearDraft();
 
       router.push(`/intake/generating?id=${reportId}`);
     } catch (err) {

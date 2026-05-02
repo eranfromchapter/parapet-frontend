@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useIntakeWizard } from "@/context/IntakeWizardContext";
 
 const STEPS = [
   { label: "Home Type", path: "/intake/home-type" },
@@ -32,6 +33,7 @@ export default function IntakeWizardShell({
   hideNext = false,
 }: IntakeWizardShellProps) {
   const router = useRouter();
+  const { markStepComplete } = useIntakeWizard();
   const stepIndex = currentStep - 1;
   const progressPercent = (currentStep / STEPS.length) * 100;
 
@@ -44,6 +46,10 @@ export default function IntakeWizardShell({
   };
 
   const handleNext = () => {
+    // Record the just-completed step and fire a draft autosave before
+    // letting the page advance. The save is fire-and-forget inside the
+    // context, so this never blocks navigation.
+    markStepComplete(currentStep);
     if (onNext) {
       onNext();
     } else if (currentStep < STEPS.length) {
