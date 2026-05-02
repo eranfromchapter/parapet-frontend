@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Sparkles, CheckCircle2, Eye, ImageIcon, Link2, Tag, MessageSquare } from "lucide-react";
+import { Sparkles, CheckCircle2, Eye, ImageIcon, Link2, Tag, MessageSquare, AlertTriangle } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
 import { getAuthHeaders } from "@/lib/auth";
@@ -12,6 +13,10 @@ import { getAuthHeaders } from "@/lib/auth";
 // Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
 const API_URL = "/api/backend";
 
+// Page copy promises 10–15 minutes; give the timeout enough headroom so it
+// only fires for genuinely stuck jobs.
+const HARD_TIMEOUT_MS = 900_000;
+
 const STEPS = [
   "Analyzing room data",
   "Generating concepts",
@@ -20,12 +25,15 @@ const STEPS = [
   "Finalizing designs",
 ];
 
+type DesignStatus = "processing" | "complete" | "timeout" | "failed";
+
 function GeneratingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session");
 
-  const [status, setStatus] = useState<"processing" | "complete">("processing");
+  const [status, setStatus] = useState<DesignStatus>("processing");
+  const [errorDetail, setErrorDetail] = useState<string>("");
   const [currentStep, setCurrentStep] = useState(0);
   const [sessionData, setSessionData] = useState<any>(null);
   const startTime = useRef(Date.now());
@@ -33,15 +41,23 @@ function GeneratingContent() {
   // statusRef mirrors the status state so pollSession can read it without
   // being a dependency — avoids recreating the callback (and restarting the
   // interval) every time status changes.
-  const statusRef = useRef<"processing" | "complete">("processing");
+  const statusRef = useRef<DesignStatus>("processing");
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const pollSession = useCallback(async () => {
-    if (!sessionId || redirected.current || statusRef.current === "complete") return;
+  const stopPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
 
-    // Hard timeout at 180s — clear the interval so it stops firing
-    if (Date.now() - startTime.current > 180_000) {
-      if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }
+  const pollSession = useCallback(async () => {
+    if (!sessionId || redirected.current || statusRef.current !== "processing") return;
+
+    if (Date.now() - startTime.current > HARD_TIMEOUT_MS) {
+      statusRef.current = "timeout";
+      setStatus("timeout");
+      stopPolling();
       return;
     }
 
@@ -57,7 +73,16 @@ function GeneratingContent() {
         statusRef.current = "complete";
         setStatus("complete");
         setCurrentStep(STEPS.length);
+        stopPolling();
         try { localStorage.removeItem("parapet_design_summary"); } catch {}
+        return;
+      }
+
+      if (data.status === "failed" || data.status === "error") {
+        statusRef.current = "failed";
+        setStatus("failed");
+        setErrorDetail(typeof data.error === "string" ? data.error : "");
+        stopPolling();
         return;
       }
 
@@ -66,20 +91,35 @@ function GeneratingContent() {
         setCurrentStep(Math.min(Math.floor((data.progress_pct / 100) * STEPS.length), STEPS.length - 1));
       }
     } catch { /* keep polling */ }
-  }, [sessionId]);
+  }, [sessionId, stopPolling]);
 
   useEffect(() => {
     if (!sessionId) return;
     pollIntervalRef.current = setInterval(pollSession, 3000);
     pollSession();
     return () => {
-      if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }
+      stopPolling();
     };
-  }, [sessionId, pollSession]);
+  }, [sessionId, pollSession, stopPolling]);
 
-  // Animated step progress for visual feedback
+  // Resume polling after a timeout — resets the wall clock and restarts the
+  // interval so a slow-but-still-running design pipeline isn't permanently
+  // abandoned by the UI.
+  const handleCheckAgain = useCallback(() => {
+    startTime.current = Date.now();
+    statusRef.current = "processing";
+    setStatus("processing");
+    setErrorDetail("");
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    pollIntervalRef.current = setInterval(pollSession, 3000);
+    pollSession();
+  }, [pollSession]);
+
+  // Animated step progress for visual feedback — pause once we've left the
+  // active processing state so the dots don't keep advancing on the
+  // timeout / failed / complete screens.
   useEffect(() => {
-    if (status === "complete") return;
+    if (status !== "processing") return;
     const timer = setInterval(() => {
       setCurrentStep(prev => {
         if (prev < STEPS.length - 1) return prev + 1;
@@ -108,6 +148,69 @@ function GeneratingContent() {
     } catch { return null; }
   });
   const summaryItems = sessionData?.style_preferences;
+
+  if (status === "timeout") {
+    return (
+      <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-[#FAFBFC] relative shadow-xl">
+        <PageHeader title="Generating Design" backPath="/design" />
+        <div className="flex-1 flex flex-col items-center justify-center px-6">
+          <div className="w-20 h-20 rounded-full bg-[#F59E0B]/15 flex items-center justify-center mb-6">
+            <AlertTriangle size={36} className="text-[#F59E0B]" />
+          </div>
+          <h1 className="text-xl font-bold text-foreground mb-2 text-center">
+            This is taking longer than usual
+          </h1>
+          <p className="text-sm text-muted-foreground text-center max-w-[320px] mb-8">
+            Your design may still be processing. Try checking again in a moment, or come back later from your Design Studio.
+          </p>
+          <button
+            onClick={handleCheckAgain}
+            className="w-full bg-[#1E3A5F] text-white rounded-xl py-3.5 text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-[#1E3A5F]/20 hover:bg-[#2A4F7A] transition-colors"
+          >
+            Check again
+          </button>
+          <Link
+            href="/design"
+            className="mt-3 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Back to Design Studio
+          </Link>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-[#FAFBFC] relative shadow-xl">
+        <PageHeader title="Generating Design" backPath="/design" />
+        <div className="flex-1 flex flex-col items-center justify-center px-6">
+          <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mb-6">
+            <AlertTriangle size={36} className="text-red-600" />
+          </div>
+          <h1 className="text-xl font-bold text-foreground mb-2 text-center">
+            Design generation failed
+          </h1>
+          <p className="text-sm text-muted-foreground text-center max-w-[320px] mb-2">
+            We couldn&apos;t finish generating your design. Please try again.
+          </p>
+          {errorDetail && (
+            <p className="text-[11px] text-muted-foreground/70 text-center max-w-[300px] mb-6">
+              {errorDetail}
+            </p>
+          )}
+          <Link
+            href="/design/new"
+            className="w-full bg-[#1E3A5F] text-white rounded-xl py-3.5 text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-[#1E3A5F]/20 hover:bg-[#2A4F7A] transition-colors"
+          >
+            Try again
+          </Link>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
 
   if (status === "complete") {
     return (
