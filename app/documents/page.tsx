@@ -5,11 +5,22 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   FileText, ScanLine, Video, Palette, Calculator, FolderOpen,
-  ChevronRight, Loader2,
+  ChevronRight, Loader2, Trash2,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
 import ParapetLogo from "@/components/ParapetLogo";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "@/hooks/use-toast";
 import { getAuthHeaders } from "@/lib/auth";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -88,6 +99,18 @@ function getDocSubtitle(doc: Document): string {
   return doc.subtitle;
 }
 
+// Map a document type to its DELETE endpoint. Estimates have no delete
+// endpoint in the backend, so we render no trash button for them.
+function getDeleteUrl(doc: Document): string | null {
+  switch (doc.type) {
+    case "report": return `${API_URL}/v1/readiness-reports/${doc.id}`;
+    case "spatial": return `${API_URL}/v1/spatial/${doc.id}`;
+    case "walkthrough": return `${API_URL}/v1/walkthrough/${doc.id}`;
+    case "design": return `${API_URL}/v1/design/${doc.id}`;
+    default: return null;
+  }
+}
+
 type FilterType = "all" | "report" | "spatial" | "walkthrough" | "design" | "estimate";
 
 const FILTERS: { key: FilterType; label: string; statsKey?: keyof Stats["by_type"] }[] = [
@@ -106,6 +129,54 @@ export default function DocumentVaultPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Document | null>(null);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+
+  const handleDelete = async (doc: Document) => {
+    const url = getDeleteUrl(doc);
+    if (!url) return;
+    // Optimistic removal — snapshot for rollback if the request fails.
+    const snapshot = documents;
+    setDeletingIds((prev) => new Set(prev).add(doc.id));
+    setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+    try {
+      const res = await fetch(url, { method: "DELETE", headers: getAuthHeaders() });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `Server responded ${res.status}`);
+      }
+      toast({ title: "Deleted", description: doc.title });
+      // Reflect the deletion in the per-type counts so the filter pills update.
+      setStats((prev) => {
+        if (!prev) return prev;
+        const map: Record<Document["type"], keyof Stats["by_type"]> = {
+          report: "reports",
+          spatial: "spatial",
+          walkthrough: "walkthroughs",
+          design: "designs",
+          estimate: "estimates",
+        };
+        const key = map[doc.type];
+        return {
+          total: Math.max(0, prev.total - 1),
+          by_type: { ...prev.by_type, [key]: Math.max(0, prev.by_type[key] - 1) },
+        };
+      });
+    } catch (err) {
+      setDocuments(snapshot);
+      toast({
+        variant: "destructive",
+        title: "Couldn't delete document",
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setDeletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(doc.id);
+        return next;
+      });
+    }
+  };
 
   useEffect(() => {
     async function load() {
@@ -226,6 +297,8 @@ export default function DocumentVaultPage() {
             const subtitle = getDocSubtitle(doc);
 
             const archived = !!doc.archived;
+            const canDelete = getDeleteUrl(doc) !== null;
+            const isDeleting = deletingIds.has(doc.id);
             return (
               <Link key={doc.id} href={getDocHref(doc)}>
                 <div className={`bg-white rounded-xl border p-3.5 flex items-center gap-3 transition-colors overflow-hidden ${
@@ -257,6 +330,22 @@ export default function DocumentVaultPage() {
                       <span className="text-[10px] text-muted-foreground/60">{timeAgo(doc.created_at)}</span>
                     </div>
                   </div>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      aria-label={`Delete ${doc.title}`}
+                      disabled={isDeleting}
+                      onClick={(e) => {
+                        // Inside the Link — block navigation so the tap only opens the confirm dialog.
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setConfirmDelete(doc);
+                      }}
+                      className="p-2 -mr-1 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                    >
+                      {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                    </button>
+                  )}
                   <ChevronRight size={16} className={archived ? "text-muted-foreground/40 shrink-0" : "text-muted-foreground shrink-0"} />
                 </div>
               </Link>
@@ -267,6 +356,35 @@ export default function DocumentVaultPage() {
       </div>
 
       <BottomNav />
+
+      <AlertDialog
+        open={confirmDelete !== null}
+        onOpenChange={(open) => { if (!open) setConfirmDelete(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this document?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDelete?.title}
+              <br />
+              This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const target = confirmDelete;
+                setConfirmDelete(null);
+                if (target) handleDelete(target);
+              }}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
