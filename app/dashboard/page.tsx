@@ -6,7 +6,7 @@ import ParapetLogo from "@/components/ParapetLogo";
 import BottomNav from "@/components/BottomNav";
 import { getAuthHeaders } from "@/lib/auth";
 import {
-  Bell, Plus, ArrowRight, Camera, FileText, BarChart3,
+  Plus, ArrowRight, Camera, FileText, BarChart3,
   AlertTriangle, Scan, PenTool, Palette, Scale,
   Shield, Gavel, FileCheck, MapPin, DollarSign,
   CalendarRange, Hammer, Bug, FolderArchive, Package,
@@ -152,13 +152,9 @@ export default function DashboardPage() {
           <span className="text-base font-bold text-[#1E3A5F] tracking-tight">PARAPET</span>
         </div>
         <div className="flex items-center gap-3">
-          {/* Day 44 round-3: previously this bell was a non-interactive
-              <button> with no onClick — duplicating the BottomNav alerts
-              icon. Now it links to /notifications so both surfaces work. */}
-          <Link href="/notifications" className="relative p-1" aria-label="Alerts">
-            <Bell size={20} className="text-muted-foreground" />
-            <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-red-500" />
-          </Link>
+          {/* Single source of truth for the alerts badge is BottomNav, which
+              shows the live unread count. The header bell here was static
+              and duplicated that surface — removed. */}
           <Link href="/account" className="w-8 h-8 rounded-full bg-[#1E3A5F] flex items-center justify-center">
             {userInitials ? (
               <span className="text-[11px] font-bold text-white">{userInitials}</span>
