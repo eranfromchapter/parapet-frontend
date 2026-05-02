@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ChevronLeft, Maximize, Video, Upload, CheckCircle2,
   Camera, ArrowRight, Mic, X, Info, ChevronRight,
+  ScanLine, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BottomNav from "@/components/BottomNav";
@@ -135,6 +137,32 @@ function RecordingOverlay({ seconds, onStop, stream }: { seconds: number; onStop
   );
 }
 
+// ── Helpers ──
+
+function timeAgo(iso: string | undefined | null): string {
+  if (!iso) return "";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return "";
+  const mins = Math.floor(Math.max(0, ms) / 60_000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
+
+type WalkthroughBadgeKind = "processing" | "transcribed" | "failed";
+
+function walkthroughBadge(status: string | undefined): { kind: WalkthroughBadgeKind; label: string } {
+  const s = (status || "").toLowerCase();
+  if (s.includes("fail") || s.includes("error")) return { kind: "failed", label: "Failed" };
+  if (s === "transcribed" || s === "analyzed") return { kind: "transcribed", label: "Transcribed" };
+  return { kind: "processing", label: "Processing" };
+}
+
 // ── Page ──
 
 export default function SpaceCapturePage() {
@@ -173,7 +201,42 @@ export default function SpaceCapturePage() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
+  const [existingScans, setExistingScans] = useState<any[]>([]);
+  const [existingWalkthroughs, setExistingWalkthroughs] = useState<any[]>([]);
+  const [loadingExisting, setLoadingExisting] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Pull previously uploaded scans + walkthroughs so the page isn't empty
+  // for returning users. Vault is the source of truth for spatial metadata
+  // (subtitle line carries room count + sqft); /v1/walkthrough has the
+  // freshest analysis status for video uploads.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadExisting() {
+      try {
+        const [vaultRes, wtRes] = await Promise.all([
+          fetch(`${API_URL}/v1/documents/vault`, { headers: getAuthHeaders() }),
+          fetch(`${API_URL}/v1/walkthrough`, { headers: getAuthHeaders() }),
+        ]);
+        if (cancelled) return;
+        if (vaultRes.ok) {
+          const data = await vaultRes.json();
+          const docs: any[] = data.documents ?? [];
+          setExistingScans(docs.filter((d) => d.type === "spatial"));
+        }
+        if (wtRes.ok) {
+          const list = await wtRes.json();
+          setExistingWalkthroughs(Array.isArray(list) ? list : []);
+        }
+      } catch {
+        /* fail silently — page still works for upload */
+      } finally {
+        if (!cancelled) setLoadingExisting(false);
+      }
+    }
+    loadExisting();
+    return () => { cancelled = true; };
+  }, []);
 
   // Recording timer
   useEffect(() => {
@@ -455,6 +518,70 @@ export default function SpaceCapturePage() {
               <p className="text-[10px] text-muted-foreground mt-0.5">Narrate your vision</p>
             </button>
           </div>
+
+          {/* ── Your Uploads (returning users) ── */}
+          {!loadingExisting && (existingScans.length > 0 || existingWalkthroughs.length > 0) && (
+            <div className="mb-4">
+              <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
+                Your Uploads
+              </h3>
+              <div className="rounded-xl border border-border/50 bg-card divide-y divide-border/30 overflow-hidden">
+                {existingScans.map((doc: any) => (
+                  <Link
+                    key={`spatial-${doc.id}`}
+                    href={`/capture/${doc.id}`}
+                    className="flex items-center gap-3 px-3.5 py-3 w-full text-left hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-[#1E3A5F]/8 flex items-center justify-center flex-shrink-0">
+                      <ScanLine size={16} className="text-[#1E3A5F]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-foreground truncate">{doc.title || "LiDAR Scan"}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {doc.subtitle ? `${doc.subtitle} · ` : ""}{timeAgo(doc.created_at)}
+                      </p>
+                    </div>
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-[#10B981]/15 text-[#10B981] mr-1">
+                      Ready
+                    </span>
+                    <ChevronRight size={14} className="text-muted-foreground flex-shrink-0" />
+                  </Link>
+                ))}
+                {existingWalkthroughs.map((wt: any) => {
+                  const badge = walkthroughBadge(wt.status);
+                  const badgeStyles: Record<WalkthroughBadgeKind, string> = {
+                    processing: "bg-[#F59E0B]/15 text-[#F59E0B]",
+                    transcribed: "bg-[#10B981]/15 text-[#10B981]",
+                    failed: "bg-red-100 text-red-700",
+                  };
+                  return (
+                    <Link
+                      key={`wt-${wt.id}`}
+                      href={`/walkthrough/${wt.id}`}
+                      className="flex items-center gap-3 px-3.5 py-3 w-full text-left hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-[#2BCBBA]/10 flex items-center justify-center flex-shrink-0">
+                        <Video size={16} className="text-[#1E3A5F]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-foreground truncate">
+                          {wt.original_filename || wt.filename || "Video Walkthrough"}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {timeAgo(wt.created_at)}
+                        </p>
+                      </div>
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold mr-1 ${badgeStyles[badge.kind]}`}>
+                        {badge.kind === "processing" && <Loader2 size={8} className="animate-spin" />}
+                        {badge.label}
+                      </span>
+                      <ChevronRight size={14} className="text-muted-foreground flex-shrink-0" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* ── Upload Area ── */}
           <div
