@@ -1,12 +1,9 @@
 'use client';
 
-import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Home, Search, FileText, User, Bell } from "lucide-react";
-
-// Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
-const API_URL = "/api/backend";
+import { useUnreadCount } from "@/context/NotificationContext";
 
 const navItems = [
   { path: "/dashboard", icon: Home, label: "Home" },
@@ -21,33 +18,9 @@ const navItems = [
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function fetchUnread() {
-      try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("parapet_token") : null;
-        if (!token) return;
-        const res = await fetch(`${API_URL}/v1/notifications/unread-count`, {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: controller.signal,
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setUnreadCount(data.unread_count ?? 0);
-        }
-      } catch (err) {
-        if ((err as Error).name === "AbortError") return;
-        /* fail silently for other errors */
-      }
-    }
-
-    fetchUnread();
-    const interval = setInterval(fetchUnread, 60000);
-    return () => { controller.abort(); clearInterval(interval); };
-  }, []);
+  // Single global subscription via NotificationProvider — every BottomNav
+  // mount reads the same cached count; no per-mount polling loop.
+  const unreadCount = useUnreadCount();
 
   return (
     <nav className="bottom-nav bg-white dark:bg-[hsl(214,25%,13%)] border-t border-border/60" data-testid="bottom-nav">
