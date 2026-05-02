@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Home, Search, FileText, Shield, Bell } from "lucide-react";
+import { Home, Search, FileText, User, Bell } from "lucide-react";
 
 // Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
 const API_URL = "/api/backend";
@@ -11,8 +11,11 @@ const API_URL = "/api/backend";
 const navItems = [
   { path: "/dashboard", icon: Home, label: "Home" },
   { path: "/capture", icon: Search, label: "Discover" },
-  { path: "/bids", icon: FileText, label: "Bids" },
-  { path: "/payments", icon: Shield, label: "Payments" },
+  // /bids and /payments don't ship yet — point at routes that exist today
+  // so taps don't 404. The labels stay distinct from the items above so the
+  // five-tab layout still reads cleanly.
+  { path: "/documents", icon: FileText, label: "Docs" },
+  { path: "/account", icon: User, label: "Account" },
   { path: "/notifications", icon: Bell, label: "Alerts" },
 ];
 
