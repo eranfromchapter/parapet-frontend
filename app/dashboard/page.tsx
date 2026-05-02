@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import ParapetLogo from "@/components/ParapetLogo";
 import BottomNav from "@/components/BottomNav";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   useProfile,
   useReadinessReports,
@@ -157,26 +158,37 @@ export default function DashboardPage() {
 
       <div className="flex-1 px-4 pt-4 pb-4 safe-bottom overflow-y-auto">
 
-        {/* ── Skeleton while initial data loads (prevents onboarding/active-card flicker) ── */}
+        {/* ── Layout-preserving skeleton — mirrors the active card + 3 phase
+             cards below so the page doesn't jump when data arrives. ── */}
         {loading && (
           <>
-            <div className="rounded-2xl border border-border/50 bg-card p-5 mb-5 animate-pulse">
-              <div className="h-4 w-40 bg-muted rounded mb-3" />
-              <div className="h-3 w-56 bg-muted/70 rounded mb-4" />
+            <div className="rounded-2xl border border-border/50 bg-card p-5 mb-5">
+              <Skeleton className="h-4 w-40 mb-3" />
+              <Skeleton className="h-3 w-56 mb-4" />
               <div className="space-y-2">
-                <div className="h-12 bg-muted/60 rounded-xl" />
-                <div className="h-12 bg-muted/40 rounded-xl" />
-                <div className="h-12 bg-muted/40 rounded-xl" />
+                <Skeleton className="h-12 rounded-xl" />
+                <Skeleton className="h-12 rounded-xl" />
+                <Skeleton className="h-12 rounded-xl" />
               </div>
             </div>
             <div className="grid grid-cols-4 gap-3 mb-5">
               {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="flex flex-col items-center gap-1.5 animate-pulse">
-                  <div className="w-12 h-12 rounded-full bg-muted" />
-                  <div className="h-2.5 w-10 bg-muted rounded" />
+                <div key={i} className="flex flex-col items-center gap-1.5">
+                  <Skeleton className="w-12 h-12 rounded-full" />
+                  <Skeleton className="h-2.5 w-10" />
                 </div>
               ))}
             </div>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="rounded-2xl border border-border/50 bg-card p-4 mb-4">
+                <Skeleton className="h-3 w-24 mb-3" />
+                <div className="space-y-2">
+                  <Skeleton className="h-10 rounded-xl" />
+                  <Skeleton className="h-10 rounded-xl" />
+                  <Skeleton className="h-10 rounded-xl" />
+                </div>
+              </div>
+            ))}
           </>
         )}
 

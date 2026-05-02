@@ -21,6 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
 import { getAuthHeaders } from "@/lib/auth";
 import { useVault, useDocumentStats } from "@/lib/hooks/use-documents";
@@ -249,12 +250,35 @@ export default function DocumentVaultPage() {
   const total = stats?.total ?? documents.length;
 
   if (loading) {
+    // Layout-preserving skeleton — same shell (header, filter pills,
+    // BottomNav) as the loaded view so the page doesn't jump on hydrate.
     return (
-      <div className="max-w-[430px] mx-auto min-h-[100dvh] flex items-center justify-center bg-[#FAFBFC] shadow-xl">
-        <div className="flex flex-col items-center gap-4">
-          <ParapetLogo size={48} className="text-[#1E3A5F] animate-pulse" />
-          <p className="text-sm text-muted-foreground">Loading documents...</p>
+      <div className="max-w-[430px] mx-auto min-h-[100dvh] flex flex-col bg-[#FAFBFC] relative shadow-xl">
+        <PageHeader title="Document Vault" backPath="/dashboard" />
+        <div className="px-4 py-3 overflow-x-hidden">
+          <div className="flex gap-2">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-7 w-16 rounded-full" />
+            ))}
+          </div>
         </div>
+        <div className="flex-1 px-4 pb-4 space-y-2.5">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="bg-white rounded-xl border border-border/50 p-3.5 flex items-center gap-3">
+              <Skeleton className="w-10 h-10 rounded-lg" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <Skeleton className="h-3.5 w-3/5" />
+                <Skeleton className="h-2.5 w-2/5" />
+                <div className="flex items-center gap-2 pt-0.5">
+                  <Skeleton className="h-3 w-14 rounded-full" />
+                  <Skeleton className="h-2.5 w-10" />
+                </div>
+              </div>
+              <Skeleton className="w-4 h-4 rounded shrink-0" />
+            </div>
+          ))}
+        </div>
+        <BottomNav />
       </div>
     );
   }
