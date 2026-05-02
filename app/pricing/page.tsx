@@ -51,7 +51,7 @@ export default function PricingPage() {
         'Downloadable PDF report',
       ],
       cta: (
-        <Link href="/readiness">
+        <Link href="/intake/home-type">
           <Button variant="outline" className="w-full">Current Plan</Button>
         </Link>
       ),
