@@ -43,6 +43,15 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   manifest: "/site.webmanifest",
+  // Tells iOS Safari this is a Home-Screen-installable web app: drops the
+  // browser chrome, uses a black-translucent status bar, and shows the
+  // apple-touch-icon as the launcher icon. Next.js maps these to the
+  // canonical apple-mobile-web-app-* meta tags in the rendered <head>.
+  appleWebApp: {
+    capable: true,
+    title: "PARAPET",
+    statusBarStyle: "black-translucent",
+  },
   openGraph: {
     type: "website",
     url: SITE_URL,

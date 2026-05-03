@@ -11,7 +11,18 @@ import {
   KeyRound, Shield, FileText, HelpCircle,
   Bell, MessageSquare, LogOut, DollarSign,
 } from "lucide-react";
-import { getAuthHeaders, clearAuth } from "@/lib/auth";
+import { getAuthHeaders } from "@/lib/auth";
+import { useAuth } from "@/lib/AuthProvider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -131,6 +142,8 @@ export default function AccountPage() {
 
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const { logout } = useAuth();
 
   const loadProfile = useCallback(async () => {
     try {
@@ -207,9 +220,14 @@ export default function AccountPage() {
   };
 
   const handleSignOut = () => {
-    clearAuth();
-    toast({ title: "Signed out successfully" });
-    router.push("/");
+    setShowSignOutConfirm(true);
+  };
+
+  const confirmSignOut = () => {
+    setShowSignOutConfirm(false);
+    toast({ title: "Signed out" });
+    // AuthProvider clears the token and routes to /login.
+    logout();
   };
 
   const comingSoon = (label: string) => {
@@ -543,7 +561,6 @@ export default function AccountPage() {
             {([
               { label: "Change Password", icon: KeyRound },
               { label: "Security & Privacy", icon: Shield },
-              { label: "Help & Support", icon: HelpCircle },
             ]).map(({ label, icon: Icon }) => (
               <button
                 key={label}
@@ -555,6 +572,14 @@ export default function AccountPage() {
                 <ChevronRight size={16} className="text-[#64748B]" />
               </button>
             ))}
+            <Link
+              href="/support"
+              className="flex items-center gap-3 px-4 py-3.5 w-full hover:bg-gray-50 transition-colors"
+            >
+              <HelpCircle size={18} className="text-[#64748B] flex-shrink-0" />
+              <span className="flex-1 text-[14px] text-[#1E3A5F] font-medium">Help & Support</span>
+              <ChevronRight size={16} className="text-[#64748B]" />
+            </Link>
             <Link
               href="/terms?from=account"
               className="flex items-center gap-3 px-4 py-3.5 w-full hover:bg-gray-50 transition-colors"
@@ -622,6 +647,29 @@ export default function AccountPage() {
           </div>
         </div>
       )}
+
+      <AlertDialog
+        open={showSignOutConfirm}
+        onOpenChange={(open) => { if (!open) setShowSignOutConfirm(false); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sign out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to sign out? You&apos;ll need to enter your email again to come back in.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmSignOut}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Sign out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <BottomNav />
     </div>

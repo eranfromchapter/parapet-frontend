@@ -42,6 +42,7 @@ interface StoredDraft {
   data: IntakeFormData;
   step: number;
   completedSteps: number[];
+  consent: boolean;
   updatedAt: number; // ms since epoch — local clock
 }
 
@@ -53,6 +54,10 @@ interface IntakeWizardContextType {
   completedSteps: number[];
   markStepComplete: (step: number) => void;
   clearDraft: () => Promise<void>;
+  // Clickwrap consent on the review step. Persisted with the rest of the
+  // draft so it survives a refresh, just like the form fields.
+  consent: boolean;
+  setConsent: (next: boolean) => void;
 }
 
 const IntakeWizardContext = createContext<IntakeWizardContextType | null>(null);
@@ -63,12 +68,13 @@ function readSessionDraft(): StoredDraft | null {
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    // New shape: { data, step, completedSteps, updatedAt }
+    // New shape: { data, step, completedSteps, consent, updatedAt }
     if (parsed && typeof parsed === "object" && parsed.data && typeof parsed.data === "object") {
       return {
         data: { ...defaultFormData, ...parsed.data },
         step: typeof parsed.step === "number" ? parsed.step : 1,
         completedSteps: Array.isArray(parsed.completedSteps) ? parsed.completedSteps : [],
+        consent: typeof parsed.consent === "boolean" ? parsed.consent : false,
         updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : 0,
       };
     }
@@ -78,6 +84,7 @@ function readSessionDraft(): StoredDraft | null {
         data: { ...defaultFormData, ...(parsed as Partial<IntakeFormData>) },
         step: 1,
         completedSteps: [],
+        consent: false,
         updatedAt: 0,
       };
     }
@@ -106,6 +113,10 @@ function loadInitialStep(): number {
 
 function loadInitialCompleted(): number[] {
   return readSessionDraft()?.completedSteps ?? [];
+}
+
+function loadInitialConsent(): boolean {
+  return readSessionDraft()?.consent ?? false;
 }
 
 function authHeaders(): Record<string, string> {
@@ -179,6 +190,7 @@ async function fetchServerDraftIfNewer(localUpdatedAt: number): Promise<StoredDr
       data: { ...defaultFormData, ...(body.data ?? {}) },
       step: typeof body.step === "number" ? body.step : 1,
       completedSteps: Array.isArray(body.completed_steps) ? body.completed_steps : [],
+      consent: typeof (body as any).consent === "boolean" ? (body as any).consent : false,
       updatedAt: serverUpdatedAt,
     };
   } catch {
@@ -186,7 +198,12 @@ async function fetchServerDraftIfNewer(localUpdatedAt: number): Promise<StoredDr
   }
 }
 
-function putServerDraft(payload: { step: number; data: IntakeFormData; completed_steps: number[] }) {
+function putServerDraft(payload: {
+  step: number;
+  data: IntakeFormData;
+  completed_steps: number[];
+  consent: boolean;
+}) {
   if (typeof window === "undefined") return;
   // Fire-and-forget — must not block the UI flow.
   fetch("/api/backend/v1/intake/draft", {
@@ -219,6 +236,7 @@ export function IntakeWizardProvider({ children }: { children: React.ReactNode }
   const [formData, setFormData] = useState<IntakeFormData>(loadInitialFormData);
   const [step, setStep] = useState<number>(loadInitialStep);
   const [completedSteps, setCompletedSteps] = useState<number[]>(loadInitialCompleted);
+  const [consent, setConsentState] = useState<boolean>(loadInitialConsent);
   const hydratedRef = useRef(true);
   // Track the local "last edit" timestamp so we can compare against the
   // server draft and pick the newer one.
@@ -234,6 +252,7 @@ export function IntakeWizardProvider({ children }: { children: React.ReactNode }
       setFormData(server.data);
       setStep(server.step);
       setCompletedSteps(server.completedSteps);
+      setConsentState(server.consent);
       localUpdatedAtRef.current = server.updatedAt;
       writeSessionDraft(server);
     });
@@ -272,10 +291,10 @@ export function IntakeWizardProvider({ children }: { children: React.ReactNode }
     const t = setTimeout(() => {
       const ts = Date.now();
       localUpdatedAtRef.current = ts;
-      writeSessionDraft({ data: formData, step, completedSteps, updatedAt: ts });
+      writeSessionDraft({ data: formData, step, completedSteps, consent, updatedAt: ts });
     }, 300);
     return () => clearTimeout(t);
-  }, [formData, step, completedSteps]);
+  }, [formData, step, completedSteps, consent]);
 
   const updateFormData = useCallback((updates: Partial<IntakeFormData>) => {
     setFormData((prev) => ({ ...prev, ...updates }));
@@ -291,13 +310,18 @@ export function IntakeWizardProvider({ children }: { children: React.ReactNode }
       : [...completedSteps, completedStep];
     setStep(nextStep);
     setCompletedSteps(nextCompleted);
-    putServerDraft({ step: nextStep, data: formData, completed_steps: nextCompleted });
-  }, [formData, step, completedSteps]);
+    putServerDraft({ step: nextStep, data: formData, completed_steps: nextCompleted, consent });
+  }, [formData, step, completedSteps, consent]);
+
+  const setConsent = useCallback((next: boolean) => {
+    setConsentState(next);
+  }, []);
 
   const resetFormData = useCallback(() => {
     setFormData(defaultFormData);
     setStep(1);
     setCompletedSteps([]);
+    setConsentState(false);
     localUpdatedAtRef.current = 0;
     if (typeof window !== "undefined") {
       try { window.sessionStorage.removeItem(STORAGE_KEY); } catch {}
@@ -308,6 +332,7 @@ export function IntakeWizardProvider({ children }: { children: React.ReactNode }
     setFormData(defaultFormData);
     setStep(1);
     setCompletedSteps([]);
+    setConsentState(false);
     localUpdatedAtRef.current = 0;
     if (typeof window !== "undefined") {
       try { window.sessionStorage.removeItem(STORAGE_KEY); } catch {}
@@ -325,6 +350,8 @@ export function IntakeWizardProvider({ children }: { children: React.ReactNode }
         completedSteps,
         markStepComplete,
         clearDraft,
+        consent,
+        setConsent,
       }}
     >
       {children}

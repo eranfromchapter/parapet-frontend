@@ -1,10 +1,12 @@
 'use client';
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useIntakeWizard } from "@/context/IntakeWizardContext";
 import IntakeWizardShell from "@/components/IntakeWizardShell";
 import { Pencil, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState } from "react";
 import type { IntakeFormData } from "@/context/IntakeWizardContext";
 
@@ -65,7 +67,7 @@ function mapFormToBackend(formData: IntakeFormData) {
 
 export default function IntakeReview() {
   const router = useRouter();
-  const { formData, clearDraft } = useIntakeWizard();
+  const { formData, clearDraft, consent, setConsent } = useIntakeWizard();
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -189,11 +191,45 @@ export default function IntakeReview() {
         </div>
       )}
 
-      <div className="mt-6">
+      {/* Clickwrap consent — required before the user can submit. */}
+      <label
+        htmlFor="intake-consent"
+        className={`mt-6 flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer select-none transition-colors ${
+          consent
+            ? "bg-[#1E3A5F]/[0.04] border-[#1E3A5F]/30"
+            : "bg-white border-border/60 hover:border-border"
+        }`}
+      >
+        <Checkbox
+          id="intake-consent"
+          checked={consent}
+          onCheckedChange={(next) => setConsent(next === true)}
+          className="mt-0.5"
+        />
+        <span className="text-[11px] text-foreground leading-relaxed flex-1">
+          I agree to the{" "}
+          <Link
+            href="/terms?from=intake"
+            className="underline underline-offset-2 hover:text-[#1E3A5F]"
+          >
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link
+            href="/privacy?from=intake"
+            className="underline underline-offset-2 hover:text-[#1E3A5F]"
+          >
+            Privacy Policy
+          </Link>
+          .
+        </span>
+      </label>
+
+      <div className="mt-3">
         <Button
           onClick={handleGenerate}
-          disabled={generating}
-          className="w-full h-12 bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#1E3A5F]/20"
+          disabled={generating || !consent}
+          className="w-full h-12 bg-[#1E3A5F] hover:bg-[#2A4F7A] disabled:bg-gray-300 disabled:text-white/80 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-[#1E3A5F]/20"
         >
           {generating ? (
             <>
@@ -211,28 +247,6 @@ export default function IntakeReview() {
 
       <p className="text-[10px] text-muted-foreground text-center mt-2">
         Takes about 30 seconds. No credit card required.
-      </p>
-
-      <p className="text-[10px] text-muted-foreground text-center mt-3 leading-relaxed">
-        By submitting, you agree to our{" "}
-        <a
-          href="/terms?from=intake"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-foreground transition-colors"
-        >
-          Terms of Service
-        </a>{" "}
-        and{" "}
-        <a
-          href="/privacy?from=intake"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-foreground transition-colors"
-        >
-          Privacy Policy
-        </a>
-        .
       </p>
     </IntakeWizardShell>
   );

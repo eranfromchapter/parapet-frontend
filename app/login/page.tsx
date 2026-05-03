@@ -1,19 +1,27 @@
 'use client';
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ParapetLogo from "@/components/ParapetLogo";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Mail } from "lucide-react";
+import { ArrowLeft, ArrowRight, Mail } from "lucide-react";
+import { useAuth } from "@/lib/AuthProvider";
 
 // Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
 const API_URL = "/api/backend";
 
+type ErrorState =
+  | { kind: 'message'; text: string }
+  | { kind: 'no_account' }
+  | null;
+
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorState>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,25 +37,31 @@ export default function LoginPage() {
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
 
+      if (res.status === 404) {
+        setError({ kind: 'no_account' });
+        return;
+      }
+      if (res.status === 429) {
+        setError({ kind: 'message', text: "Too many attempts. Please wait a moment." });
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        if (res.status === 404) {
-          setError("No account found with this email. Complete a readiness report first to create your account.");
-        } else {
-          setError(data?.detail || "Something went wrong. Please try again.");
-        }
+        setError({ kind: 'message', text: data?.detail || "Something went wrong. Please try again." });
         return;
       }
 
       const data = await res.json();
-
-      // Store the JWT
-      localStorage.setItem("parapet_token", data.access_token);
-
-      // Go to dashboard
+      if (!data?.access_token) {
+        setError({ kind: 'message', text: "Login response missing token. Please try again." });
+        return;
+      }
+      // AuthProvider owns the localStorage write + the in-memory state so
+      // the rest of the app sees the new auth state immediately.
+      login(data.access_token);
       router.push("/dashboard");
     } catch {
-      setError("Unable to connect. Please try again.");
+      setError({ kind: 'message', text: "Unable to connect. Please try again." });
     } finally {
       setLoading(false);
     }
@@ -56,12 +70,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <div className="flex-1 flex flex-col items-center justify-center px-6">
-        <div className="w-full max-w-[340px]">
+        <div className="w-full max-w-[380px]">
           <div className="flex flex-col items-center mb-8">
             <ParapetLogo size={48} className="text-[#1E3A5F] mb-4" />
-            <h1 className="text-xl font-bold text-foreground mb-1">Welcome back</h1>
+            <h1 className="text-xl font-bold text-foreground mb-1">Welcome to PARAPET</h1>
             <p className="text-sm text-muted-foreground text-center">
-              Sign in with the email you used for your readiness report.
+              Enter your email to sign in or create an account.
             </p>
           </div>
 
@@ -85,9 +99,24 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {error && (
+            {error?.kind === 'message' && (
               <div className="p-3 rounded-xl bg-red-50 border border-red-200">
-                <p className="text-xs text-red-700">{error}</p>
+                <p className="text-xs text-red-700">{error.text}</p>
+              </div>
+            )}
+
+            {error?.kind === 'no_account' && (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 space-y-2">
+                <p className="text-xs text-amber-900 leading-relaxed">
+                  No account found. Start your first renovation assessment to create one.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => router.push('/intake/home-type')}
+                  className="w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-lg bg-[#2BCBBA] hover:bg-[#1E8A7E] text-white text-xs font-semibold transition-colors"
+                >
+                  Start renovation assessment <ArrowRight size={12} />
+                </button>
               </div>
             )}
 
@@ -99,22 +128,22 @@ export default function LoginPage() {
               {loading ? (
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
-                "Sign In"
+                "Continue"
               )}
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-xs text-muted-foreground mb-3">
-              Don&apos;t have an account yet?
-            </p>
-            <button
-              onClick={() => router.push("/intake/home-type")}
-              className="text-xs font-semibold text-[#2BCBBA] hover:text-[#1E3A5F] transition-colors"
-            >
-              Get your free readiness report &rarr;
-            </button>
-          </div>
+          <p className="mt-6 text-[11px] text-muted-foreground text-center leading-relaxed">
+            By continuing, you agree to our{" "}
+            <Link href="/terms" className="underline underline-offset-2 hover:text-foreground transition-colors">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground transition-colors">
+              Privacy Policy
+            </Link>
+            .
+          </p>
 
           <button
             onClick={() => router.push("/")}
