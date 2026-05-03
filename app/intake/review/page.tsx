@@ -8,6 +8,7 @@ import { Pencil, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useState } from "react";
+import { getAuthHeaders } from "@/lib/auth";
 import type { IntakeFormData } from "@/context/IntakeWizardContext";
 
 const SCOPE_LABELS: Record<string, string> = {
@@ -80,9 +81,13 @@ export default function IntakeReview() {
       const apiUrl = "/api/backend";
       const body = mapFormToBackend(formData);
 
+      // Spread getAuthHeaders() so a returning user with an existing JWT
+      // (e.g. starting a new project from /account) is recognized; for the
+      // first-time signup case it's an empty object and the backend creates
+      // the user as before.
       const res = await fetch(`${apiUrl}/v1/readiness-reports`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify(body),
       });
 
