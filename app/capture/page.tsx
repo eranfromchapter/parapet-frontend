@@ -157,6 +157,43 @@ function timeAgo(iso: string | undefined | null): string {
   return `${months}mo ago`;
 }
 
+type PhotoUploadStatus = "uploading" | "success" | "error";
+interface PhotoUpload {
+  localKey: string;
+  localUrl: string;
+  file: File;
+  status: PhotoUploadStatus;
+  serverId?: string;
+  blobUrl?: string;
+  error?: string;
+}
+
+async function postPhoto(file: File): Promise<{ id?: string; blobUrl?: string }> {
+  const formData = new FormData();
+  formData.append("files", file);
+  // Don't set Content-Type — FormData sets it with the multipart boundary.
+  const res = await fetch(`${API_URL}/v1/photos/upload`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: formData,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `Upload failed (${res.status})`);
+  }
+  const data = await res.json().catch(() => ({}));
+  // Backend may return a single object, an array, or { photos: [...] }.
+  const first = Array.isArray(data) ? data[0]
+    : Array.isArray(data?.photos) ? data.photos[0]
+    : data;
+  return {
+    id: typeof first?.id === "string" ? first.id : undefined,
+    blobUrl: typeof first?.blob_url === "string" ? first.blob_url
+      : typeof first?.blobUrl === "string" ? first.blobUrl
+      : undefined,
+  };
+}
+
 function formatDuration(totalSeconds: number | undefined): string | null {
   if (totalSeconds == null || !Number.isFinite(totalSeconds) || totalSeconds <= 0) return null;
   const t = Math.round(totalSeconds);
@@ -216,7 +253,10 @@ export default function SpaceCapturePage() {
   // feedback: "the report does not show the total square footage of the
   // scanned space."
   const [totalSqft, setTotalSqft] = useState<number>(0);
-  const [photos, setPhotos] = useState<string[]>([]);
+  // Each entry tracks the lifecycle of a single photo through /v1/photos/upload.
+  // localUrl is the blob URL used as a thumbnail until the server returns one;
+  // we revoke it as soon as the upload succeeds to avoid memory leaks.
+  const [photos, setPhotos] = useState<PhotoUpload[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
   const [uploadPercent, setUploadPercent] = useState(0);
@@ -252,6 +292,71 @@ export default function SpaceCapturePage() {
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isRecording]);
+
+  // Revoke any photo blob URLs still in flight when the page unmounts. The
+  // success path revokes them inline, but a leftover error/uploading entry
+  // would otherwise hang on to memory until the tab closes. A ref mirrors
+  // the latest array so the unmount handler doesn't snapshot stale data.
+  const photosRef = useRef<PhotoUpload[]>([]);
+  useEffect(() => { photosRef.current = photos; }, [photos]);
+  useEffect(() => {
+    return () => {
+      photosRef.current.forEach((p) => {
+        if (p.localUrl) {
+          try { URL.revokeObjectURL(p.localUrl); } catch { /* ignore */ }
+        }
+      });
+    };
+  }, []);
+
+  // ── Photo upload helpers (declared before handleFileSelect because the
+  //     dropzone hands jpg/png/heic files off to startPhotoUpload). ──
+
+  const performPhotoUpload = useCallback(async (file: File, localKey: string, localUrl: string) => {
+    try {
+      const { id, blobUrl } = await postPhoto(file);
+      setPhotos((prev) => prev.map((p) =>
+        p.localKey === localKey
+          ? { ...p, status: "success", serverId: id, blobUrl }
+          : p,
+      ));
+      try { URL.revokeObjectURL(localUrl); } catch { /* already revoked */ }
+    } catch (err) {
+      setPhotos((prev) => prev.map((p) =>
+        p.localKey === localKey
+          ? { ...p, status: "error", error: err instanceof Error ? err.message : "Upload failed" }
+          : p,
+      ));
+    }
+  }, []);
+
+  const startPhotoUpload = useCallback((file: File) => {
+    const localKey = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const localUrl = URL.createObjectURL(file);
+    setPhotos((prev) => [...prev, { localKey, localUrl, file, status: "uploading" }]);
+    void performPhotoUpload(file, localKey, localUrl);
+  }, [performPhotoUpload]);
+
+  const retryPhotoUpload = useCallback((localKey: string) => {
+    setPhotos((prev) => {
+      const target = prev.find((p) => p.localKey === localKey);
+      if (!target) return prev;
+      void performPhotoUpload(target.file, localKey, target.localUrl);
+      return prev.map((p) =>
+        p.localKey === localKey ? { ...p, status: "uploading", error: undefined } : p,
+      );
+    });
+  }, [performPhotoUpload]);
+
+  const removeFailedPhoto = useCallback((localKey: string) => {
+    setPhotos((prev) => {
+      const target = prev.find((p) => p.localKey === localKey);
+      if (target) {
+        try { URL.revokeObjectURL(target.localUrl); } catch { /* ignore */ }
+      }
+      return prev.filter((p) => p.localKey !== localKey);
+    });
+  }, []);
 
   // ── XHR upload with progress ──
 
@@ -292,6 +397,15 @@ export default function SpaceCapturePage() {
     if (!file) return;
 
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+
+    // Photos run as their own per-thumbnail lifecycle and shouldn't lock
+    // the dropzone UI behind isUploading the way a multi-minute video would.
+    if (["jpg", "jpeg", "png", "heic"].includes(ext)) {
+      startPhotoUpload(file);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
     setIsUploading(true);
 
     try {
@@ -369,10 +483,6 @@ export default function SpaceCapturePage() {
             /* best-effort */
           }
         }
-      } else if (["jpg", "jpeg", "png", "heic"].includes(ext)) {
-        const url = URL.createObjectURL(file);
-        setPhotos(prev => [...prev, url]);
-        setToast("Photo added.");
       } else {
         setToast("Unsupported file type. Please upload PDF, MP4, MOV, JPG, or PNG.");
       }
@@ -383,7 +493,7 @@ export default function SpaceCapturePage() {
       setUploadProgress("");
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  }, [spatialId]);
+  }, [spatialId, startPhotoUpload, uploadWithProgress]);
 
   // ── Video recording ──
 
@@ -487,15 +597,15 @@ export default function SpaceCapturePage() {
   const handlePhotoCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setPhotos(prev => [...prev, URL.createObjectURL(file)]);
-      setToast("Photo captured.");
+      startPhotoUpload(file);
     }
     if (photoInputRef.current) photoInputRef.current.value = "";
-  }, []);
+  }, [startPhotoUpload]);
 
   // ── Generate estimate ──
 
-  const hasInput = !!spatialId || !!walkthroughId || photos.length > 0;
+  const successfulPhotoCount = photos.filter((p) => p.status === "success").length;
+  const hasInput = !!spatialId || !!walkthroughId || successfulPhotoCount > 0;
 
   const handleGenerate = useCallback(async () => {
     const params = new URLSearchParams();
@@ -793,12 +903,65 @@ export default function SpaceCapturePage() {
             </div>
           )}
 
-          {/* ── Photo thumbnails ── */}
+          {/* ── Photo thumbnails — each tracks its own upload lifecycle ── */}
           {photos.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-2 mb-3">
-              {photos.map((src, i) => (
-                <img key={i} src={src} alt={`Photo ${i + 1}`} className="w-16 h-16 rounded-lg object-cover flex-shrink-0 border border-border/50" />
-              ))}
+            <div className="mb-3">
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {photos.map((p) => (
+                  <div
+                    key={p.localKey}
+                    className="relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-border/50 bg-muted/40"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={p.blobUrl ?? p.localUrl}
+                      alt="Captured photo"
+                      className="w-full h-full object-cover"
+                    />
+                    {p.status === "uploading" && (
+                      <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
+                        <Loader2 size={16} className="text-white animate-spin" />
+                      </div>
+                    )}
+                    {p.status === "success" && (
+                      <div className="absolute bottom-0.5 right-0.5 bg-emerald-600 rounded-full p-0.5 shadow">
+                        <CheckCircle2 size={12} className="text-white" />
+                      </div>
+                    )}
+                    {p.status === "error" && (
+                      <button
+                        type="button"
+                        onClick={() => retryPhotoUpload(p.localKey)}
+                        title={p.error ?? "Upload failed"}
+                        className="absolute inset-0 bg-red-600/85 text-white text-[10px] font-semibold flex flex-col items-center justify-center"
+                      >
+                        <AlertCircle size={14} />
+                        Retry
+                      </button>
+                    )}
+                    {p.status === "error" && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); removeFailedPhoto(p.localKey); }}
+                        aria-label="Remove failed photo"
+                        className="absolute top-0.5 right-0.5 bg-white/90 hover:bg-white rounded-full p-0.5 shadow"
+                      >
+                        <X size={10} className="text-red-600" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {successfulPhotoCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => router.push("/documents")}
+                  className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#1E3A5F] hover:underline underline-offset-2"
+                >
+                  <FolderOpen size={12} />
+                  View {successfulPhotoCount} photo{successfulPhotoCount === 1 ? "" : "s"} in Document Vault
+                </button>
+              )}
             </div>
           )}
 
