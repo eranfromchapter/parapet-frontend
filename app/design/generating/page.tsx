@@ -30,7 +30,13 @@ type DesignStatus = "processing" | "complete" | "timeout" | "failed";
 function GeneratingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // ?session=NEW       — normal in-flight polling
+  // ?session_id=OLD &  — coming from /design/results "Regenerate with Changes":
+  //   revision_notes=  fetch the old session, POST a new generate carrying
+  //                    its preferences + revision notes, then poll the new id.
   const sessionId = searchParams.get("session");
+  const regenSourceId = searchParams.get("session_id");
+  const revisionNotes = searchParams.get("revision_notes") ?? "";
 
   const [status, setStatus] = useState<DesignStatus>("processing");
   const [errorDetail, setErrorDetail] = useState<string>("");
@@ -38,11 +44,56 @@ function GeneratingContent() {
   const [sessionData, setSessionData] = useState<any>(null);
   const startTime = useRef(Date.now());
   const redirected = useRef(false);
+  const regenStartedRef = useRef(false);
   // statusRef mirrors the status state so pollSession can read it without
   // being a dependency — avoids recreating the callback (and restarting the
   // interval) every time status changes.
   const statusRef = useRef<DesignStatus>("processing");
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Regenerate-with-changes flow. Fires once on mount when the URL carries
+  // session_id + revision_notes (and not the normal ?session= param). Pulls
+  // the old session, POSTs a new generate with the old preferences plus
+  // revision_notes, then router.replaces to ?session=NEW for normal polling.
+  useEffect(() => {
+    if (sessionId) return;             // already on a new session — just poll
+    if (!regenSourceId || !revisionNotes) return;
+    if (regenStartedRef.current) return;
+    regenStartedRef.current = true;
+    (async () => {
+      try {
+        const oldRes = await fetch(`${API_URL}/v1/design/${regenSourceId}`, {
+          headers: getAuthHeaders(),
+        });
+        if (!oldRes.ok) throw new Error(`Couldn't load original design (${oldRes.status})`);
+        const oldData = await oldRes.json();
+        const body = {
+          project_id: oldData.project_id ?? oldData.spatial_id ?? "default",
+          room_type: oldData.room_type ?? "",
+          room_data: oldData.room_data ?? undefined,
+          style_preferences: oldData.style_preferences ?? {},
+          revision_notes: revisionNotes,
+        };
+        const genRes = await fetch(`${API_URL}/v1/design/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+          body: JSON.stringify(body),
+        });
+        if (!genRes.ok) {
+          const text = await genRes.text().catch(() => "");
+          throw new Error(text || `Regenerate failed (${genRes.status})`);
+        }
+        const data = await genRes.json();
+        const newId = data.session_id ?? data.id;
+        if (!newId) throw new Error("Regenerate response missing session id");
+        router.replace(`/design/generating?session=${newId}`);
+      } catch (err) {
+        statusRef.current = "failed";
+        setStatus("failed");
+        setErrorDetail(err instanceof Error ? err.message : "Regenerate failed");
+      }
+    })();
+  }, [sessionId, regenSourceId, revisionNotes, router]);
 
   const stopPolling = useCallback(() => {
     if (pollIntervalRef.current) {

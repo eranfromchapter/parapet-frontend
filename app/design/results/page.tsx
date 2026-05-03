@@ -115,6 +115,11 @@ function ResultsContent() {
     selectionKeys?: Set<string>;
   } | null>(null);
 
+  // Free-form revision feedback the user wants applied to a regenerated
+  // concept. Submitting hands /design/generating the original session id
+  // plus these notes; that page handles the regen API call.
+  const [revisionNotes, setRevisionNotes] = useState("");
+
   const fetchSession = useCallback(async () => {
     if (!sessionId) return;
     try {
@@ -558,6 +563,34 @@ function ResultsContent() {
             >
               View Design Report
             </button>
+
+            {/* Revision feedback — generates a new concept incorporating the
+                user's free-form notes. The generating page handles the
+                regen POST after picking up the original session_id. */}
+            <section className="mt-6 border-t border-border/40 pt-4">
+              <h3 className="text-sm font-semibold mb-2">Want changes to this design?</h3>
+              <textarea
+                placeholder="Describe what you'd like to change (e.g., 'Make the cabinets white instead of gray')"
+                className="w-full rounded-lg border border-border/60 bg-white p-3 min-h-[100px] text-sm focus:outline-none focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F] resize-none placeholder:text-muted-foreground/50"
+                value={revisionNotes}
+                onChange={(e) => setRevisionNotes(e.target.value)}
+              />
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams();
+                  if (sessionId) params.set("session_id", sessionId);
+                  params.set("revision_notes", revisionNotes.trim());
+                  router.push(`/design/generating?${params.toString()}`);
+                }}
+                disabled={!revisionNotes.trim()}
+                className="mt-2 w-full py-2.5 bg-[#1E3A5F] text-white rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#2A4F7A] transition-colors"
+              >
+                Regenerate with Changes
+              </button>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                A new design concept will be generated incorporating your feedback.
+              </p>
+            </section>
 
             <div className="h-4" />
           </>
