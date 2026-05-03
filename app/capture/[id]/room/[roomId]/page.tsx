@@ -7,6 +7,7 @@ import { CheckCircle2, Ruler, Camera, Layers } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
 import ParapetLogo from "@/components/ParapetLogo";
+import { FloorPlanPreview } from "@/components/FloorPlanPreview";
 import { getAuthHeaders } from "@/lib/auth";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -173,6 +174,8 @@ export default function RoomDetailPage() {
       <PageHeader title={roomName} subtitle="Room detail" backPath={`/capture/${spatialId}`} />
 
       <div className="flex-1 px-4 pt-4 pb-4 overflow-y-auto safe-bottom space-y-3">
+
+        <FloorPlanPreview spatialId={spatialId} />
 
         {/* ── Type Badge ── */}
         {room.room_type && (

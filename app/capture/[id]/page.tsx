@@ -10,6 +10,7 @@ import {
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
 import ParapetLogo from "@/components/ParapetLogo";
+import { FloorPlanPreview } from "@/components/FloorPlanPreview";
 import { getAuthHeaders } from "@/lib/auth";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -174,6 +175,8 @@ export default function SpatialScanDetailPage() {
       <PageHeader title="Space Scan" subtitle="LiDAR scan overview" backPath={backPath} />
 
       <div className="flex-1 px-4 pt-4 pb-4 overflow-y-auto safe-bottom">
+
+        <FloorPlanPreview spatialId={spatialId} />
 
         {/* ── Summary Card ── */}
         <Card className="p-4 mb-4 rounded-xl border border-border/50">
