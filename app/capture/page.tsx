@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import BottomNav from "@/components/BottomNav";
+import { UploadStatusBadge } from "@/components/UploadStatusBadge";
 import { getAuthHeaders } from "@/lib/auth";
 import { useVault } from "@/lib/hooks/use-documents";
 import { useWalkthroughs } from "@/lib/hooks/use-dashboard";
@@ -347,16 +348,6 @@ export default function SpaceCapturePage() {
       );
     });
   }, [performPhotoUpload]);
-
-  const removeFailedPhoto = useCallback((localKey: string) => {
-    setPhotos((prev) => {
-      const target = prev.find((p) => p.localKey === localKey);
-      if (target) {
-        try { URL.revokeObjectURL(target.localUrl); } catch { /* ignore */ }
-      }
-      return prev.filter((p) => p.localKey !== localKey);
-    });
-  }, []);
 
   // ── XHR upload with progress ──
 
@@ -781,8 +772,18 @@ export default function SpaceCapturePage() {
           </div>
 
           {/* ── Status indicators ── */}
-          {(spatialId || walkthroughId || walkthroughError) && (
+          {(spatialId || walkthroughId || walkthroughError || (isUploading && uploadProgress.startsWith("Uploading video"))) && (
             <div className="space-y-2 mb-4">
+              {/* In-flight video upload badge complements the existing
+                  success / error cards below — appears only while the
+                  walkthrough is still streaming. */}
+              {isUploading && !walkthroughId && !walkthroughError && uploadProgress.startsWith("Uploading video") && (
+                <UploadStatusBadge
+                  status="uploading"
+                  message="Uploading walkthrough video"
+                  progress={uploadPercent || undefined}
+                />
+              )}
               {spatialId && (
                 <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200/50">
                   <CheckCircle2 size={14} className="text-emerald-500" />
@@ -929,29 +930,37 @@ export default function SpaceCapturePage() {
                       </div>
                     )}
                     {p.status === "error" && (
-                      <button
-                        type="button"
-                        onClick={() => retryPhotoUpload(p.localKey)}
+                      <div
                         title={p.error ?? "Upload failed"}
-                        className="absolute inset-0 bg-red-600/85 text-white text-[10px] font-semibold flex flex-col items-center justify-center"
+                        className="absolute inset-0 bg-red-600/70 flex items-center justify-center"
                       >
-                        <AlertCircle size={14} />
-                        Retry
-                      </button>
-                    )}
-                    {p.status === "error" && (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); removeFailedPhoto(p.localKey); }}
-                        aria-label="Remove failed photo"
-                        className="absolute top-0.5 right-0.5 bg-white/90 hover:bg-white rounded-full p-0.5 shadow"
-                      >
-                        <X size={10} className="text-red-600" />
-                      </button>
+                        <AlertCircle size={16} className="text-white" />
+                      </div>
                     )}
                   </div>
                 ))}
               </div>
+
+              {/* One UploadStatusBadge per non-success photo so the user
+                  sees its filename, retry, and (eventually) progress without
+                  squinting at the thumbnail overlay. */}
+              {photos.some((p) => p.status !== "success") && (
+                <div className="mt-2 space-y-1.5">
+                  {photos
+                    .filter((p) => p.status !== "success")
+                    .map((p) => (
+                      <UploadStatusBadge
+                        key={`badge-${p.localKey}`}
+                        status={p.status}
+                        message={p.status === "error"
+                          ? `${p.file.name} — ${p.error ?? "upload failed"}`
+                          : `${p.file.name} — uploading…`}
+                        onRetry={p.status === "error" ? () => retryPhotoUpload(p.localKey) : undefined}
+                      />
+                    ))}
+                </div>
+              )}
+
               {successfulPhotoCount > 0 && (
                 <button
                   type="button"
