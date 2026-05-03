@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   FileText, ScanLine, Video, Palette, Calculator, FolderOpen,
-  ChevronRight, Loader2, Trash2, Download,
+  ChevronRight, Loader2, Trash2, Download, Camera,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
@@ -26,6 +26,11 @@ import { toast } from "@/hooks/use-toast";
 import { getAuthHeaders } from "@/lib/auth";
 import { useVault, useDocumentStats } from "@/lib/hooks/use-documents";
 import { useWalkthroughs } from "@/lib/hooks/use-dashboard";
+import { usePhotos, type Photo } from "@/lib/hooks/use-photos";
+import {
+  Dialog,
+  DialogContent,
+} from "@/components/ui/dialog";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -34,7 +39,7 @@ const API_URL = "/api/backend";
 
 interface Document {
   id: string;
-  type: "report" | "spatial" | "walkthrough" | "design" | "estimate";
+  type: "report" | "spatial" | "walkthrough" | "design" | "estimate" | "photo";
   title: string;
   subtitle: string;
   status: string;
@@ -43,6 +48,9 @@ interface Document {
   icon: string;
   actions: string[];
   total_estimate?: number;
+  // Photos render their thumbnail in place of the type icon; the URL is
+  // attached here so the renderer doesn't need a second lookup.
+  thumbnailUrl?: string;
   // Backend (Day 44 archive-on-supersede) flips this to true on every
   // prior estimate when a new one lands. The vault still shows them so
   // history is recoverable, but they render muted.
@@ -60,7 +68,27 @@ const ICON_MAP: Record<string, typeof FileText> = {
   walkthrough: Video,
   design: Palette,
   estimate: Calculator,
+  photo: Camera,
 };
+
+function photoToDocument(p: Photo): Document {
+  const blob = p.blob_url ?? p.blobUrl ?? "";
+  const room = p.room_label ?? p.roomLabel ?? "";
+  const title = room || p.original_filename || p.filename || "Photo";
+  const subtitle = p.original_filename || p.filename || "";
+  return {
+    id: p.id,
+    type: "photo",
+    title,
+    subtitle,
+    status: "uploaded",
+    created_at: p.created_at ?? p.uploaded_at ?? new Date().toISOString(),
+    source: "photo",
+    icon: "camera",
+    actions: [],
+    thumbnailUrl: blob || undefined,
+  };
+}
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   completed: { bg: "bg-[#10B981]/15", text: "text-[#10B981]", label: "Completed" },
@@ -99,6 +127,7 @@ function getDocHref(doc: Document): string {
     case "walkthrough": return `/walkthrough/${doc.id}?from=vault`;
     case "design": return `/design/results?session=${doc.id}&from=vault`;
     case "estimate": return `/estimate/${doc.id}?from=vault`;
+    case "photo": return "#"; // opens a lightbox instead of navigating
     default: return "#";
   }
 }
@@ -128,6 +157,7 @@ function getDeleteUrl(doc: Document): string | null {
     case "spatial": return `${API_URL}/v1/spatial/${doc.id}`;
     case "walkthrough": return `${API_URL}/v1/walkthrough/${doc.id}`;
     case "design": return `${API_URL}/v1/design/${doc.id}`;
+    case "photo": return `${API_URL}/v1/photos/${doc.id}`;
     default: return null;
   }
 }
@@ -149,7 +179,7 @@ function safeFilename(title: string, fallback: string): string {
   return base.endsWith(".pdf") ? base : `${base}.pdf`;
 }
 
-type FilterType = "all" | "report" | "spatial" | "walkthrough" | "design" | "estimate";
+type FilterType = "all" | "report" | "spatial" | "walkthrough" | "design" | "estimate" | "photo";
 
 const FILTERS: { key: FilterType; label: string; statsKey?: keyof Stats["by_type"] }[] = [
   { key: "all", label: "All" },
@@ -158,6 +188,9 @@ const FILTERS: { key: FilterType; label: string; statsKey?: keyof Stats["by_type
   { key: "walkthrough", label: "Videos", statsKey: "walkthroughs" },
   { key: "design", label: "Designs", statsKey: "designs" },
   { key: "estimate", label: "Estimates", statsKey: "estimates" },
+  // Photos aren't in /v1/documents/stats yet — count comes from the
+  // /v1/photos response length below.
+  { key: "photo", label: "Photos" },
 ];
 
 export default function DocumentVaultPage() {
@@ -166,8 +199,20 @@ export default function DocumentVaultPage() {
   const vaultQuery = useVault();
   const statsQuery = useDocumentStats();
   const walkthroughsQuery = useWalkthroughs();
-  const documents: Document[] = vaultQuery.data?.documents ?? [];
+  const photosQuery = usePhotos();
+  // /v1/documents/vault doesn't list photos yet, so we synthesize Document
+  // entries from /v1/photos and merge them in (sorted by created_at desc
+  // so the most recent uploads land at the top). The same filter pills
+  // and tile chrome render them with no additional branching.
+  const photoDocuments: Document[] = (photosQuery.data ?? []).map(photoToDocument);
+  const baseDocuments: Document[] = vaultQuery.data?.documents ?? [];
+  const documents: Document[] = [...baseDocuments, ...photoDocuments].sort((a, b) => {
+    const ta = new Date(a.created_at).getTime();
+    const tb = new Date(b.created_at).getTime();
+    return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
+  });
   const stats: Stats | null = (statsQuery.data as Stats | null) ?? null;
+  const photoCount = photoDocuments.length;
   const loading = vaultQuery.isPending;
   const error = vaultQuery.error instanceof Error ? vaultQuery.error.message : null;
   // Map of walkthrough id → duration. Vault tiles for type="walkthrough"
@@ -188,6 +233,7 @@ export default function DocumentVaultPage() {
   const [confirmDelete, setConfirmDelete] = useState<Document | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
+  const [lightboxPhoto, setLightboxPhoto] = useState<Document | null>(null);
 
   const handleDownload = async (doc: Document) => {
     const url = getPdfUrl(doc);
@@ -230,30 +276,37 @@ export default function DocumentVaultPage() {
   const handleDelete = async (doc: Document) => {
     const url = getDeleteUrl(doc);
     if (!url) return;
-    // Snapshot the cached vault + stats for rollback before optimistically
-    // mutating them through the query cache.
+    // Snapshot the relevant caches for rollback before mutating optimistically.
     const vaultSnapshot = queryClient.getQueryData<{ documents: Document[] }>(['documents', 'vault']);
     const statsSnapshot = queryClient.getQueryData<Stats>(['documents', 'stats']);
+    const photosSnapshot = queryClient.getQueryData<Photo[]>(['photos', 'list']);
     setDeletingIds((prev) => new Set(prev).add(doc.id));
-    queryClient.setQueryData<{ documents: Document[] }>(['documents', 'vault'], (prev) => {
-      if (!prev) return prev;
-      return { ...prev, documents: prev.documents.filter((d) => d.id !== doc.id) };
-    });
-    queryClient.setQueryData<Stats>(['documents', 'stats'], (prev) => {
-      if (!prev) return prev;
-      const map: Record<Document["type"], keyof Stats["by_type"]> = {
-        report: "reports",
-        spatial: "spatial",
-        walkthrough: "walkthroughs",
-        design: "designs",
-        estimate: "estimates",
-      };
-      const key = map[doc.type];
-      return {
-        total: Math.max(0, prev.total - 1),
-        by_type: { ...prev.by_type, [key]: Math.max(0, prev.by_type[key] - 1) },
-      };
-    });
+    if (doc.type === "photo") {
+      queryClient.setQueryData<Photo[]>(['photos', 'list'], (prev) =>
+        prev ? prev.filter((p) => p.id !== doc.id) : prev,
+      );
+    } else {
+      queryClient.setQueryData<{ documents: Document[] }>(['documents', 'vault'], (prev) => {
+        if (!prev) return prev;
+        return { ...prev, documents: prev.documents.filter((d) => d.id !== doc.id) };
+      });
+      queryClient.setQueryData<Stats>(['documents', 'stats'], (prev) => {
+        if (!prev) return prev;
+        const map: Partial<Record<Document["type"], keyof Stats["by_type"]>> = {
+          report: "reports",
+          spatial: "spatial",
+          walkthrough: "walkthroughs",
+          design: "designs",
+          estimate: "estimates",
+        };
+        const key = map[doc.type];
+        if (!key) return prev;
+        return {
+          total: Math.max(0, prev.total - 1),
+          by_type: { ...prev.by_type, [key]: Math.max(0, prev.by_type[key] - 1) },
+        };
+      });
+    }
     try {
       const res = await fetch(url, { method: "DELETE", headers: getAuthHeaders() });
       if (!res.ok) {
@@ -262,9 +315,10 @@ export default function DocumentVaultPage() {
       }
       toast({ title: "Deleted", description: doc.title });
     } catch (err) {
-      // Restore both snapshots — keep the cache consistent if anything failed.
+      // Restore the caches we touched — keep state consistent if anything failed.
       if (vaultSnapshot) queryClient.setQueryData(['documents', 'vault'], vaultSnapshot);
       if (statsSnapshot) queryClient.setQueryData(['documents', 'stats'], statsSnapshot);
+      if (photosSnapshot) queryClient.setQueryData(['photos', 'list'], photosSnapshot);
       toast({
         variant: "destructive",
         title: "Couldn't delete document",
@@ -280,7 +334,7 @@ export default function DocumentVaultPage() {
   };
 
   const filtered = filter === "all" ? documents : documents.filter(d => d.type === filter);
-  const total = stats?.total ?? documents.length;
+  const total = (stats?.total ?? baseDocuments.length) + photoCount;
 
   if (loading) {
     // Layout-preserving skeleton — same shell (header, filter pills,
@@ -366,7 +420,11 @@ export default function DocumentVaultPage() {
       <div className="px-4 py-3 overflow-x-auto">
         <div className="flex gap-2 min-w-max">
           {FILTERS.map((f) => {
-            const count = f.key === "all" ? total : (stats?.by_type?.[f.statsKey!] ?? 0);
+            const count = f.key === "all"
+              ? total
+              : f.key === "photo"
+              ? photoCount
+              : (stats?.by_type?.[f.statsKey!] ?? 0);
             const isActive = filter === f.key;
             return (
               <button
@@ -407,17 +465,32 @@ export default function DocumentVaultPage() {
             const canDownload = getPdfUrl(doc) !== null;
             const isDeleting = deletingIds.has(doc.id);
             const isDownloading = downloadingIds.has(doc.id);
-            return (
-              <Link key={doc.id} href={getDocHref(doc)}>
+            const isPhoto = doc.type === "photo";
+
+            // Photo tiles open a lightbox instead of navigating; everything
+            // else renders the same shell wrapped in a Next.js Link.
+            const tileBody = (
                 <div className={`bg-white rounded-xl border p-3.5 flex items-center gap-3 transition-colors overflow-hidden ${
                   archived
                     ? "border-border/30 opacity-70 hover:border-border/60"
                     : "border-border/50 hover:border-[#1E3A5F]/30"
                 }`}>
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                    archived ? "bg-muted/40" : "bg-[#1E3A5F]/5"
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden ${
+                    isPhoto && doc.thumbnailUrl
+                      ? "bg-muted/40"
+                      : archived ? "bg-muted/40" : "bg-[#1E3A5F]/5"
                   }`}>
-                    <Icon size={18} className={archived ? "text-muted-foreground" : "text-[#1E3A5F]"} />
+                    {isPhoto && doc.thumbnailUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={doc.thumbnailUrl}
+                        alt={doc.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <Icon size={18} className={archived ? "text-muted-foreground" : "text-[#1E3A5F]"} />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-semibold truncate ${archived ? "text-muted-foreground" : "text-foreground"}`}>{doc.title}</p>
@@ -471,6 +544,21 @@ export default function DocumentVaultPage() {
                   )}
                   <ChevronRight size={16} className={archived ? "text-muted-foreground/40 shrink-0" : "text-muted-foreground shrink-0"} />
                 </div>
+            );
+
+            return isPhoto ? (
+              <button
+                key={doc.id}
+                type="button"
+                onClick={() => setLightboxPhoto(doc)}
+                className="text-left w-full"
+                aria-label={`View ${doc.title}`}
+              >
+                {tileBody}
+              </button>
+            ) : (
+              <Link key={doc.id} href={getDocHref(doc)}>
+                {tileBody}
               </Link>
             );
           })
@@ -508,6 +596,36 @@ export default function DocumentVaultPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={lightboxPhoto !== null}
+        onOpenChange={(open) => { if (!open) setLightboxPhoto(null); }}
+      >
+        <DialogContent className="max-w-[92vw] sm:max-w-[640px] p-0 bg-black border-none overflow-hidden">
+          {lightboxPhoto?.thumbnailUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={lightboxPhoto.thumbnailUrl}
+              alt={lightboxPhoto.title}
+              className="w-full h-auto max-h-[85vh] object-contain bg-black"
+            />
+          ) : (
+            <div className="aspect-square flex items-center justify-center text-white/60 text-sm">
+              No preview available
+            </div>
+          )}
+          {(lightboxPhoto?.title || lightboxPhoto?.created_at) && (
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/85 to-transparent px-4 pb-4 pt-8 pointer-events-none">
+              {lightboxPhoto?.title && (
+                <p className="text-sm font-semibold text-white">{lightboxPhoto.title}</p>
+              )}
+              {lightboxPhoto?.created_at && (
+                <p className="text-[11px] text-white/70">{timeAgo(lightboxPhoto.created_at)}</p>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
