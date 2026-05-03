@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ChevronLeft, ChevronRight, ChevronDown, ListFilter, Home,
   FileText, Clock, Search, Droplets, BedDouble, Sofa,
-  Plus, Minus, Loader2,
+  Plus, Minus, Loader2, Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import BottomNav from "@/components/BottomNav";
@@ -227,6 +227,8 @@ export default function ScopeEditorPage() {
   const totalHigh = enabledItems.reduce((s: number, i: any) => s + (i.highPrice ?? 0), 0);
   const rooms = groupByRoom(enabledItems);
   const provenance = estimate?.provenance ?? {};
+  const reconciliationNote: string | null =
+    estimate?.reconciliation_note ?? estimate?.reconciliation?.note ?? null;
   const projectLabel = provenance.rooms_parsed != null
     ? `${provenance.rooms_parsed} rooms scanned`
     : "Estimate";
@@ -338,6 +340,15 @@ export default function ScopeEditorPage() {
         </header>
 
         <div className="flex-1 px-4 pt-4 pb-4 overflow-y-auto">
+
+          {reconciliationNote && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-2">
+                <Info size={16} className="text-amber-600 mt-0.5 shrink-0" />
+                <p className="text-sm text-amber-800">{reconciliationNote}</p>
+              </div>
+            </div>
+          )}
 
           {/* Summary Card */}
           <div className="bg-[#F0F4F8] rounded-xl p-4 mb-4">

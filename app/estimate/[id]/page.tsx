@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   ChevronLeft, Download, ArrowRight, DollarSign,
-  MessageSquare, FileText, ChevronDown, ChevronUp, FolderOpen, Loader2,
+  MessageSquare, FileText, ChevronDown, ChevronUp, FolderOpen, Loader2, Info,
 } from "lucide-react";
 import ParapetLogo from "@/components/ParapetLogo";
 import BottomNav from "@/components/BottomNav";
@@ -59,6 +59,11 @@ interface Estimate {
   grand_total: number;
   cost_estimate: CostRange;
   provenance?: Provenance;
+  // Optional human-readable note describing how the backend reconciled
+  // user-confirmed material selections with the original estimate. Either
+  // a flat string field or nested under `reconciliation`.
+  reconciliation_note?: string;
+  reconciliation?: { note?: string };
   created_at?: string;
   updated_at?: string;
 }
@@ -205,6 +210,8 @@ export default function EstimateViewPage() {
   const expectedCost = costEstimate.expected ?? grandTotal;
   const highCost = costEstimate.high ?? grandTotal * 1.25;
   const provenance = estimate.provenance ?? {};
+  const reconciliationNote: string | null =
+    estimate.reconciliation_note ?? estimate.reconciliation?.note ?? null;
 
   const byCategory: Record<string, LineItem[]> = {};
   for (const item of lineItems) {
@@ -242,6 +249,15 @@ export default function EstimateViewPage() {
       </header>
 
       <div className="flex-1 px-4 pt-4 pb-4 safe-bottom overflow-y-auto">
+
+        {reconciliationNote && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+            <div className="flex items-start gap-2">
+              <Info size={16} className="text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-sm text-amber-800">{reconciliationNote}</p>
+            </div>
+          </div>
+        )}
 
         {/* ── Summary Card ── */}
         <Card className="p-4 mb-4 rounded-xl border border-border/50">
