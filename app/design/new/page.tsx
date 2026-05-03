@@ -9,15 +9,9 @@ import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
 import ParapetLogo from "@/components/ParapetLogo";
 import { getAuthHeaders } from "@/lib/auth";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-
-declare global {
-  interface Window {
-    webkitSpeechRecognition: any;
-    SpeechRecognition: any;
-  }
-}
 
 // Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
 const API_URL = "/api/backend";
@@ -48,11 +42,36 @@ export default function DesignNewPage() {
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
-  const [isListening, setIsListening] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<any>(null);
+
+  // Shared speech recognition hook — same lifecycle and UI semantics as the
+  // intake notes textarea. interimTranscript renders below the textarea in
+  // italic while transcripts incrementally fold into visionText.
+  const {
+    isListening,
+    transcript,
+    interimTranscript,
+    isSupported: speechSupported,
+    startListening,
+    stopListening,
+    resetTranscript,
+  } = useSpeechToText();
+  const visionTextRef = useRef(visionText);
+  visionTextRef.current = visionText;
+  const consumedRef = useRef("");
+  useEffect(() => {
+    if (!transcript) return;
+    const newPortion = transcript.startsWith(consumedRef.current)
+      ? transcript.slice(consumedRef.current.length)
+      : transcript;
+    consumedRef.current = transcript;
+    const trimmed = newPortion.trim();
+    if (!trimmed) return;
+    const sep = visionTextRef.current.trim() ? " " : "";
+    setVisionText(visionTextRef.current + sep + trimmed);
+  }, [transcript]);
 
   // ── Load rooms from spatial API ──
 
@@ -96,14 +115,12 @@ export default function DesignNewPage() {
     loadRooms();
   }, []);
 
-  // ── Cleanup photo previews & speech on unmount ──
+  // ── Cleanup photo previews on unmount (the speech hook handles its own
+  //     teardown). ──
 
   useEffect(() => {
     return () => {
       photos.forEach(p => URL.revokeObjectURL(p.preview));
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch {}
-      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -168,42 +185,19 @@ export default function DesignNewPage() {
 
   // ── Speech recognition ──
 
-  const toggleListening = useCallback(() => {
-    if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
+  const toggleListening = () => {
+    if (isListening) {
+      stopListening();
       return;
     }
-
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
+    if (!speechSupported) {
       showToast("Speech recognition not supported in this browser");
       return;
     }
-
-    const recognition = new SR();
-    recognition.lang = "en-US";
-    recognition.interimResults = true;
-    recognition.continuous = true;
-
-    const baseText = visionText;
-
-    recognition.onresult = (event: any) => {
-      let transcript = "";
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
-      setVisionText(baseText + (baseText ? " " : "") + transcript);
-    };
-
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => setIsListening(false);
-
-    setIsListening(true);
-    recognition.start();
-    recognitionRef.current = recognition;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isListening, visionText]);
+    consumedRef.current = "";
+    resetTranscript();
+    startListening();
+  };
 
   // ── Generate design ──
 
@@ -406,16 +400,27 @@ export default function DesignNewPage() {
                 <Lightbulb size={16} className="text-[#1E3A5F]" />
                 <h3 className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">Your Vision</h3>
               </div>
-              <button
-                onClick={toggleListening}
-                className={`flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-full transition-colors ${
-                  isListening
-                    ? "bg-red-500 text-white animate-pulse"
-                    : "text-[#1E3A5F] bg-[#1E3A5F]/10"
-                }`}
-              >
-                <Mic size={12} /> {isListening ? "Listening..." : "Speak"}
-              </button>
+              {speechSupported && (
+                <button
+                  onClick={toggleListening}
+                  className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full transition-colors ${
+                    isListening
+                      ? "bg-red-500/10 text-red-600 border border-red-500/30"
+                      : "text-[#1E3A5F] bg-[#1E3A5F]/10"
+                  }`}
+                >
+                  {isListening ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                      Listening...
+                    </>
+                  ) : (
+                    <>
+                      <Mic size={12} /> Speak
+                    </>
+                  )}
+                </button>
+              )}
             </div>
             <p className="text-xs text-muted-foreground mb-2">Describe your dream space, style preferences, or specific ideas</p>
             <textarea
@@ -424,6 +429,11 @@ export default function DesignNewPage() {
               placeholder="Example: I want a modern spa-like bathroom with clean lines, high-quality natural materials, soft layered lighting, and a sense of tranquility..."
               className="w-full h-28 rounded-xl border border-border/60 bg-white p-3 text-sm text-foreground placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F]"
             />
+            {isListening && interimTranscript && (
+              <p className="mt-1.5 text-xs italic text-muted-foreground/80 leading-snug">
+                {interimTranscript}
+              </p>
+            )}
           </section>
 
           {/* Inspiration Links */}

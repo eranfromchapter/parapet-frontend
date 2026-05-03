@@ -1,9 +1,10 @@
 'use client';
 
 import { useRouter } from "next/navigation";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import { useIntakeWizard } from "@/context/IntakeWizardContext";
 import IntakeWizardShell from "@/components/IntakeWizardShell";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 import {
   ChefHat, Bath, Hammer, PlusSquare, Zap, Droplets,
   Wind, Layers, Paintbrush, Columns3, DoorOpen, Home,
@@ -25,60 +26,46 @@ const SCOPE_OPTIONS = [
   { value: "roofing", label: "Roofing", icon: Home },
 ];
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 function ScopeNotesWithVoice({ value, onChange }: { value: string; onChange: (val: string) => void }) {
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
+  const {
+    isListening,
+    transcript,
+    interimTranscript,
+    isSupported: speechSupported,
+    startListening,
+    stopListening,
+    resetTranscript,
+  } = useSpeechToText();
+
   const valueRef = useRef(value);
   valueRef.current = value;
+  // Track how much of the hook's running transcript has already been folded
+  // into the form value so a long dictation appends incrementally instead
+  // of duplicating the whole thing on each onresult.
+  const consumedRef = useRef("");
 
-  const speechSupported =
-    typeof window !== "undefined" &&
-    ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
-
-  const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-    setIsListening(false);
-  }, []);
-
-  const startListening = useCallback(() => {
-    if (!speechSupported) return;
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SR();
-    recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.lang = "en-US";
-
-    recognition.onresult = (event: any) => {
-      let transcript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) transcript += event.results[i][0].transcript;
-      }
-      if (transcript) {
-        const current = valueRef.current;
-        const separator = current.trim() ? " " : "";
-        onChange((current + separator + transcript.trim()).slice(0, 500));
-      }
-    };
-
-    recognition.onerror = () => stopListening();
-    recognition.onend = () => setIsListening(false);
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
-  }, [speechSupported, onChange, stopListening]);
-
-  const toggleListening = useCallback(() => {
-    if (isListening) stopListening();
-    else startListening();
-  }, [isListening, startListening, stopListening]);
-
+  // Append newly-finalized transcript chunks to the form value.
   useEffect(() => {
-    return () => { if (recognitionRef.current) recognitionRef.current.stop(); };
-  }, []);
+    if (!transcript) return;
+    const newPortion = transcript.startsWith(consumedRef.current)
+      ? transcript.slice(consumedRef.current.length)
+      : transcript;
+    consumedRef.current = transcript;
+    const trimmed = newPortion.trim();
+    if (!trimmed) return;
+    const sep = valueRef.current.trim() ? " " : "";
+    onChange((valueRef.current + sep + trimmed).slice(0, 500));
+  }, [transcript, onChange]);
+
+  const toggleListening = () => {
+    if (isListening) {
+      stopListening();
+      return;
+    }
+    consumedRef.current = "";
+    resetTranscript();
+    startListening();
+  };
 
   return (
     <div className="mt-5">
@@ -128,16 +115,20 @@ function ScopeNotesWithVoice({ value, onChange }: { value: string; onChange: (va
           {isListening && (
             <span className="flex items-center gap-1 px-1.5 py-0.5 bg-red-500/10 rounded">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-[9px] font-medium text-red-600">Listening</span>
+              <span className="text-[9px] font-medium text-red-600">Listening...</span>
             </span>
           )}
           <span className="text-[10px] text-muted-foreground">{value.length}/500</span>
         </div>
       </div>
+      {(isListening || interimTranscript) && interimTranscript && (
+        <p className="mt-1.5 text-[11px] italic text-muted-foreground/80 leading-snug">
+          {interimTranscript}
+        </p>
+      )}
     </div>
   );
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 export default function IntakeScope() {
   const router = useRouter();
