@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Heart, Camera, Star, Sparkles } from "lucide-react";
+import { Heart, Camera, Star, Sparkles, Check, AlertCircle, Loader2, ArrowRight } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import BottomNav from "@/components/BottomNav";
 import { toast } from "@/hooks/use-toast";
@@ -12,6 +12,74 @@ import { getAuthHeaders } from "@/lib/auth";
 
 // Same-origin proxy (see next.config.mjs rewrites) — avoids Safari CORS preflight issues.
 const API_URL = "/api/backend";
+
+interface MaterialItem {
+  key: string;
+  name: string;
+  shortName: string;
+  category: string;
+  room: string;
+  estimatedCost: number;
+  quantity: number;
+  unit: string;
+  hasPricing: boolean;
+}
+
+interface MaterialSelection {
+  material_name: string;
+  category: string;
+  room: string;
+  estimated_cost: number;
+  quantity: number;
+  unit: string;
+  selected: boolean;
+}
+
+function shortenMaterial(mat: string): string {
+  if (mat.includes(":")) return mat.split(":")[0].trim();
+  if (mat.includes("(")) return mat.split("(")[0].trim().replace(/,\s*$/, "");
+  return mat.length > 40 ? mat.slice(0, 37) + "…" : mat;
+}
+
+function buildMaterials(concept: any): MaterialItem[] {
+  if (!concept) return [];
+  // Prefer the structured material_recommendations payload when the backend
+  // provides it; fall back to key_materials, which is a flat string list
+  // with no pricing data.
+  const recs = concept.material_recommendations;
+  if (Array.isArray(recs) && recs.length > 0) {
+    return recs.map((m: any, i: number) => {
+      const name = m?.material_name ?? m?.name ?? `Material ${i + 1}`;
+      const cost = typeof m?.estimated_cost === "number" ? m.estimated_cost : 0;
+      return {
+        key: typeof m?.id === "string" ? m.id : `rec-${i}-${name}`,
+        name,
+        shortName: shortenMaterial(name),
+        category: typeof m?.category === "string" ? m.category : "general",
+        room: typeof m?.room === "string" ? m.room : "general",
+        estimatedCost: cost,
+        quantity: typeof m?.quantity === "number" ? m.quantity : 1,
+        unit: typeof m?.unit === "string" ? m.unit : "ea",
+        hasPricing: cost > 0,
+      };
+    });
+  }
+  const keys = concept.key_materials;
+  if (Array.isArray(keys)) {
+    return keys.map((mat: string, i: number) => ({
+      key: `km-${i}`,
+      name: mat,
+      shortName: shortenMaterial(mat),
+      category: "general",
+      room: "general",
+      estimatedCost: 0,
+      quantity: 1,
+      unit: "ea",
+      hasPricing: false,
+    }));
+  }
+  return [];
+}
 
 function ResultsContent() {
   const router = useRouter();
@@ -28,6 +96,24 @@ function ResultsContent() {
   // Server-backed: at most one favorited concept per session.
   const [favoriteIndex, setFavoriteIndex] = useState<number | null>(null);
   const [savingFavorite, setSavingFavorite] = useState(false);
+
+  // Per-concept selection set (key = material.key). Initialized to "all
+  // selected" the first time we see materials for a concept; the user can
+  // un-check anything they don't want before tapping Confirm Selections.
+  const [selectedByConcept, setSelectedByConcept] = useState<Record<number, Set<string>>>({});
+  const [confirming, setConfirming] = useState(false);
+  const [confirmResult, setConfirmResult] = useState<
+    | { ok: true; conceptIndex: number; costDelta?: number }
+    | { ok: false; error: string }
+    | null
+  >(null);
+  // Server state: was this design's materials already synced to an estimate?
+  const [confirmedRemote, setConfirmedRemote] = useState<{
+    confirmed: boolean;
+    conceptIndex?: number;
+    syncedAt?: string;
+    selectionKeys?: Set<string>;
+  } | null>(null);
 
   const fetchSession = useCallback(async () => {
     if (!sessionId) return;
@@ -46,9 +132,118 @@ function ResultsContent() {
 
   useEffect(() => { fetchSession(); }, [fetchSession]);
 
+  // Load any existing material confirmation for this session so we can show
+  // "already synced" UI and prefill selections.
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/v1/design/${sessionId}/confirmed-materials`, {
+          headers: getAuthHeaders(),
+        });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (cancelled || !data) return;
+        const confirmed = !!data.confirmed;
+        const conceptIndex = typeof data.concept_index === "number" ? data.concept_index : undefined;
+        const syncedAt = typeof data.synced_at === "string" ? data.synced_at : undefined;
+        // Server may return either an array of selections or material_keys.
+        const selections: any[] = Array.isArray(data.selections) ? data.selections : [];
+        const selectionKeys = new Set<string>();
+        for (const sel of selections) {
+          const name = sel?.material_name ?? sel?.name;
+          if (typeof name === "string" && (sel?.selected ?? true)) {
+            selectionKeys.add(name);
+          }
+        }
+        setConfirmedRemote({ confirmed, conceptIndex, syncedAt, selectionKeys });
+      } catch {
+        /* not-found / no auth — leave confirmedRemote null */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [sessionId]);
+
   const concepts: any[] = session?.concepts ?? [];
   const concept = concepts[activeTab];
   const conceptCount = concepts.length;
+  const materials = useMemo<MaterialItem[]>(() => buildMaterials(concept), [concept]);
+
+  // Initialize selection to "all selected" the first time a concept's
+  // materials become known. If the server has a previous confirmation for
+  // THIS concept, prefill from those selections instead.
+  useEffect(() => {
+    if (materials.length === 0) return;
+    setSelectedByConcept((prev) => {
+      if (prev[activeTab]) return prev; // already initialized for this tab
+      const next = new Set<string>();
+      const remoteForThis =
+        confirmedRemote?.confirmed && confirmedRemote.conceptIndex === activeTab
+          ? confirmedRemote.selectionKeys
+          : null;
+      for (const m of materials) {
+        if (remoteForThis ? remoteForThis.has(m.name) : true) {
+          next.add(m.key);
+        }
+      }
+      return { ...prev, [activeTab]: next };
+    });
+  }, [materials, activeTab, confirmedRemote]);
+
+  const selectedSet = selectedByConcept[activeTab] ?? new Set<string>();
+  const toggleMaterial = (matKey: string) => {
+    setSelectedByConcept((prev) => {
+      const cur = new Set(prev[activeTab] ?? []);
+      if (cur.has(matKey)) cur.delete(matKey); else cur.add(matKey);
+      return { ...prev, [activeTab]: cur };
+    });
+    // If the user starts editing after a successful confirm banner, hide it
+    // so they can re-confirm with the new selection.
+    if (confirmResult?.ok) setConfirmResult(null);
+  };
+
+  const confirmMaterials = async () => {
+    if (!sessionId || materials.length === 0) return;
+    const selectionsPayload: MaterialSelection[] = materials.map((m) => ({
+      material_name: m.name,
+      category: m.category,
+      room: m.room,
+      estimated_cost: m.estimatedCost,
+      quantity: m.quantity,
+      unit: m.unit,
+      selected: selectedSet.has(m.key),
+    }));
+    setConfirming(true);
+    setConfirmResult(null);
+    try {
+      const res = await fetch(`${API_URL}/v1/design/${sessionId}/confirm-materials`, {
+        method: "POST",
+        headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          concept_index: activeTab,
+          selections: selectionsPayload,
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `Server responded ${res.status}`);
+      }
+      const data = await res.json().catch(() => ({}));
+      const costDelta = typeof data?.cost_delta === "number" ? data.cost_delta : undefined;
+      setConfirmResult({ ok: true, conceptIndex: activeTab, costDelta });
+      setConfirmedRemote({
+        confirmed: true,
+        conceptIndex: activeTab,
+        syncedAt: typeof data?.synced_at === "string" ? data.synced_at : new Date().toISOString(),
+        selectionKeys: new Set(selectionsPayload.filter((s) => s.selected).map((s) => s.material_name)),
+      });
+    } catch (err) {
+      setConfirmResult({ ok: false, error: err instanceof Error ? err.message : "Couldn't sync materials" });
+    } finally {
+      setConfirming(false);
+    }
+  };
 
   // Optimistically flip the heart, then persist. Tapping the already-favorited
   // concept clears the favorite (concept_index: null).
@@ -184,27 +379,134 @@ function ResultsContent() {
               </section>
             )}
 
-            {/* Key Materials */}
-            {concept.key_materials && concept.key_materials.length > 0 && (
+            {/* Key Materials \u2014 selectable, sync to estimate via /confirm-materials */}
+            {materials.length > 0 && (
               <section>
-                <h3 className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase mb-2">Key Materials</h3>
-                <div className="flex flex-wrap gap-2">
-                  {concept.key_materials.map((mat: string, i: number) => {
-                    let shortName: string;
-                    if (mat.includes(":")) {
-                      shortName = mat.split(":")[0].trim();
-                    } else if (mat.includes("(")) {
-                      shortName = mat.split("(")[0].trim().replace(/,\s*$/, "");
-                    } else {
-                      shortName = mat.length > 40 ? mat.slice(0, 37) + "\u2026" : mat;
-                    }
+                <div className="flex items-baseline justify-between mb-2">
+                  <h3 className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">Key Materials</h3>
+                  <span className="text-[10px] text-muted-foreground">
+                    {selectedSet.size} of {materials.length} selected
+                  </span>
+                </div>
+
+                {/* "Already synced" notice for this concept. */}
+                {confirmedRemote?.confirmed && confirmedRemote.conceptIndex === activeTab && !confirmResult?.ok && (
+                  <div className="mb-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                    <Check size={14} className="text-emerald-600 mt-0.5 shrink-0" />
+                    <div className="text-[11px] text-emerald-900 leading-relaxed">
+                      <p className="font-semibold">Materials already synced to your estimate</p>
+                      {confirmedRemote.syncedAt && (
+                        <p className="text-emerald-800/80">
+                          Synced {new Date(confirmedRemote.syncedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-2">
+                  {materials.map((m) => {
+                    const isSelected = selectedSet.has(m.key);
                     return (
-                      <span key={i} className="px-3 py-1.5 rounded-full bg-white border border-border/60 text-xs font-medium text-foreground">
-                        {shortName}
-                      </span>
+                      <button
+                        key={m.key}
+                        type="button"
+                        onClick={() => toggleMaterial(m.key)}
+                        aria-pressed={isSelected}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                          isSelected
+                            ? "bg-[#1E3A5F]/[0.04] border-[#1E3A5F]/30"
+                            : "bg-white border-border/60 hover:border-border"
+                        }`}
+                      >
+                        <span className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border ${
+                          isSelected ? "bg-[#1E3A5F] border-[#1E3A5F] text-white" : "border-border"
+                        }`}>
+                          {isSelected && <Check size={12} />}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-xs font-medium text-foreground truncate">{m.shortName}</span>
+                          {m.hasPricing && m.estimatedCost > 0 && (
+                            <span className="block text-[10px] text-muted-foreground">
+                              ${m.estimatedCost.toLocaleString()}
+                              {m.quantity > 1 ? ` \u00b7 ${m.quantity}${m.unit ? ` ${m.unit}` : ""}` : ""}
+                            </span>
+                          )}
+                        </span>
+                      </button>
                     );
                   })}
                 </div>
+
+                {!materials.some((m) => m.hasPricing) && (
+                  <p className="mt-2 text-[10px] text-muted-foreground">
+                    Material costs will be estimated based on your selections.
+                  </p>
+                )}
+
+                {/* Confirm / result banner */}
+                {confirmResult?.ok && confirmResult.conceptIndex === activeTab ? (
+                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <div className="flex items-start gap-2 mb-2">
+                      <Check size={14} className="text-emerald-600 mt-0.5 shrink-0" />
+                      <div className="text-xs text-emerald-900 leading-relaxed">
+                        <p className="font-semibold">Materials synced to your estimate.</p>
+                        {typeof confirmResult.costDelta === "number" && confirmResult.costDelta !== 0 && (
+                          <p className="text-emerald-800/80">
+                            Cost updated by {confirmResult.costDelta >= 0 ? "+" : "\u2212"}$
+                            {Math.abs(Math.round(confirmResult.costDelta)).toLocaleString()}.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Best-effort link to the scope page for the user's
+                        // current spatial scan; fall back to the vault if we
+                        // don't have one stashed locally.
+                        let target = "/documents";
+                        if (typeof window !== "undefined") {
+                          try {
+                            const sid = window.localStorage.getItem("parapet_spatial_id");
+                            if (sid) target = `/scope/${sid}`;
+                          } catch { /* localStorage unavailable */ }
+                        }
+                        router.push(target);
+                      }}
+                      className="w-full h-10 rounded-lg bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      View Updated Estimate <ArrowRight size={14} />
+                    </button>
+                  </div>
+                ) : confirmResult && !confirmResult.ok ? (
+                  <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
+                    <div className="flex items-start gap-2 mb-2">
+                      <AlertCircle size={14} className="text-red-600 mt-0.5 shrink-0" />
+                      <div className="text-xs text-red-900 leading-relaxed">
+                        <p className="font-semibold">Couldn&apos;t sync materials</p>
+                        <p className="text-red-800/80 break-words">{confirmResult.error}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={confirmMaterials}
+                      className="w-full h-10 rounded-lg bg-[#1E3A5F] hover:bg-[#2A4F7A] text-white text-xs font-semibold transition-colors"
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={confirmMaterials}
+                    disabled={confirming || selectedSet.size === 0}
+                    className="mt-3 w-full h-11 rounded-xl bg-[#1E3A5F] hover:bg-[#2A4F7A] disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
+                  >
+                    {confirming && <Loader2 size={14} className="animate-spin" />}
+                    {confirming ? "Syncing\u2026" : "Confirm Selections"}
+                  </button>
+                )}
               </section>
             )}
 
