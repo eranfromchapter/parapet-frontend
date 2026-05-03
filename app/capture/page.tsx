@@ -192,7 +192,7 @@ export default function SpaceCapturePage() {
     if (from === "vault") setFromVault(true);
   }, []);
   const backPath: "/dashboard" | "/documents" = fromVault ? "/documents" : "/dashboard";
-  const headerTitle = fromVault ? "My Documents" : "Space Capture";
+  const headerTitle = fromVault ? "Document Vault" : "Space Capture";
   const headerSubtitle = fromVault ? "Back to Document Vault" : "LiDAR & Photo Documentation";
   const photoInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);

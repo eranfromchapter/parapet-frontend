@@ -78,7 +78,7 @@ export default function EstimateViewPage() {
   const fromVault = fromParam === "vault";
   const fromAlerts = fromParam === "alerts";
   const backPath = fromAlerts ? "/notifications" : fromVault ? "/documents" : "/dashboard";
-  const headerTitle = fromAlerts ? "Alerts" : fromVault ? "My Documents" : "Your Estimate";
+  const headerTitle = fromAlerts ? "Alerts" : fromVault ? "Document Vault" : "Your Estimate";
   const headerSubtitle = fromAlerts
     ? "Back to Alerts"
     : fromVault

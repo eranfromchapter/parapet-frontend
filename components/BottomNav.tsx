@@ -11,7 +11,7 @@ const navItems = [
   // /bids and /payments don't ship yet — point at routes that exist today
   // so taps don't 404. The labels stay distinct from the items above so the
   // five-tab layout still reads cleanly.
-  { path: "/documents", icon: FileText, label: "Docs" },
+  { path: "/documents", icon: FileText, label: "Vault" },
   { path: "/account", icon: User, label: "Account" },
   { path: "/notifications", icon: Bell, label: "Alerts" },
 ];

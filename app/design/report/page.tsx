@@ -28,7 +28,7 @@ function ReportContent() {
   const headerTitle = fromAlerts
     ? "Alerts"
     : fromVault
-    ? "My Documents"
+    ? "Document Vault"
     : "Design Report";
   const headerSubtitle = fromAlerts
     ? "Back to Alerts"
@@ -373,7 +373,7 @@ function ReportContent() {
           onClick={() => router.push(backPath)}
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mx-auto py-2"
         >
-          <ChevronLeft size={14} /> {fromVault ? "Back to My Documents" : "Back to Design Concepts"}
+          <ChevronLeft size={14} /> {fromVault ? "Back to Document Vault" : "Back to Design Concepts"}
         </button>
 
         <div className="h-4" />

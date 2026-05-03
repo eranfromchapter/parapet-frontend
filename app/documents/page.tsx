@@ -92,7 +92,7 @@ function timeAgo(iso: string): string {
 
 function getDocHref(doc: Document): string {
   // `from=vault` lets shared destinations route the back arrow + header label
-  // to /documents / "My Documents" instead of their default entry point.
+  // to /documents / "Document Vault" instead of their default entry point.
   switch (doc.type) {
     case "report": return `/readiness/${doc.id}?from=vault`;
     case "spatial": return `/capture/${doc.id}?from=vault`;
